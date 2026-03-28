@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, Download, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -57,17 +57,75 @@ export function AudioPreview({
   title,
   duration,
   isGenerated = false,
+  audioUrl,
 }: {
   title: string;
   duration: string;
   isGenerated?: boolean;
+  audioUrl?: string;
 }) {
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(80);
   const [muted, setMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const durationSeconds = parseInt(duration) || 30;
-  const formattedDuration = `0:${durationSeconds.toString().padStart(2, "0")}`;
+  const displayDuration = audioDuration > 0 ? audioDuration : durationSeconds;
+
+  useEffect(() => {
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.addEventListener("loadedmetadata", () => {
+        setAudioDuration(audio.duration);
+      });
+      audio.addEventListener("timeupdate", () => {
+        setCurrentTime(audio.currentTime);
+      });
+      audio.addEventListener("ended", () => {
+        setPlaying(false);
+        setCurrentTime(0);
+      });
+      return () => {
+        audio.pause();
+        audio.removeEventListener("loadedmetadata", () => {});
+        audio.removeEventListener("timeupdate", () => {});
+        audio.removeEventListener("ended", () => {});
+      };
+    }
+  }, [audioUrl]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = muted ? 0 : volume / 100;
+    }
+  }, [volume, muted]);
+
+  const togglePlay = useCallback(() => {
+    if (!audioRef.current && !audioUrl) {
+      // Demo mode — just toggle visual state
+      setPlaying(!playing);
+      return;
+    }
+    if (audioRef.current) {
+      if (playing) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setPlaying(!playing);
+    }
+  }, [playing, audioUrl]);
+
+  function formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  const progress = displayDuration > 0 ? (currentTime / displayDuration) * 100 : 0;
 
   if (!isGenerated) {
     return (
@@ -100,7 +158,7 @@ export function AudioPreview({
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setPlaying(!playing)}
+            onClick={togglePlay}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-bg hover:bg-accent-hover transition-colors"
           >
             {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
@@ -112,10 +170,16 @@ export function AudioPreview({
             </p>
           </div>
         </div>
-        <button className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text hover:border-border-hover transition-colors">
-          <Download size={14} />
-          Download
-        </button>
+        {audioUrl && (
+          <a
+            href={audioUrl}
+            download
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text hover:border-border-hover transition-colors"
+          >
+            <Download size={14} />
+            Download
+          </a>
+        )}
       </div>
 
       {/* Waveform */}
@@ -127,24 +191,25 @@ export function AudioPreview({
       <div className="flex items-center gap-4 border-t border-border px-5 py-3">
         {/* Time */}
         <span className="font-mono text-xs text-text-muted">
-          <span className="text-text-secondary">
-            {playing ? "0:12" : "0:00"}
-          </span>
+          <span className="text-text-secondary">{formatTime(currentTime)}</span>
           {" / "}
-          {formattedDuration}
+          {formatTime(displayDuration)}
         </span>
 
         {/* Progress bar */}
-        <div className="flex-1 h-1 rounded-full bg-bg-deep overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-accent"
-            initial={{ width: "0%" }}
-            animate={playing ? { width: "40%" } : { width: "0%" }}
-            transition={
-              playing
-                ? { duration: durationSeconds * 0.4, ease: "linear" }
-                : { duration: 0.3 }
+        <div
+          className="flex-1 h-1 rounded-full bg-bg-deep overflow-hidden cursor-pointer"
+          onClick={(e) => {
+            if (audioRef.current && displayDuration > 0) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pct = (e.clientX - rect.left) / rect.width;
+              audioRef.current.currentTime = pct * displayDuration;
             }
+          }}
+        >
+          <div
+            className="h-full rounded-full bg-accent transition-all"
+            style={{ width: `${progress}%` }}
           />
         </div>
 

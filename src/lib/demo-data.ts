@@ -56,6 +56,12 @@ export interface Brand {
   campaigns: Campaign[];
   moments: MomentItem[];
   lastActivity: string;
+  socialProfile?: {
+    tone: string;
+    hashtags: string[];
+    imageStyle: string;
+    bestPlatforms: string[];
+  };
 }
 
 export const DEMO_BRANDS: Brand[] = [
@@ -89,6 +95,12 @@ export const DEMO_BRANDS: Brand[] = [
       additionalMusic: ["Sunny day mood bed", "Urgency/sale bed", "Evening cruiser bed"],
       sfx: ["Car engine start", "Door close", "Keys jingle", "Crowd cheer"],
       logoLine: "Tell them Tadg sent you",
+    },
+    socialProfile: {
+      tone: "Friendly, local, trustworthy",
+      hashtags: ["#TadgRiordan", "#Ashbourne", "#Meath", "#UsedCars", "#ZeroDeposit"],
+      imageStyle: "Cars in scenic Irish locations, friendly staff, showroom",
+      bestPlatforms: ["instagram", "facebook", "x"],
     },
     campaigns: [
       {
@@ -162,6 +174,60 @@ export const DEMO_BRANDS: Brand[] = [
         description: "Ashbourne GAA club final this weekend — high local engagement expected.",
         suggestedAction: "Community-focused sponsorship mention in local radio ad",
       },
+      {
+        id: "mom-7",
+        title: "Heavy rain expected — indoor activity surge predicted",
+        triggerType: "weather",
+        popScore: 68,
+        timestamp: "1 hour ago",
+        description: "Heavy rainfall forecast across Co. Meath for the weekend — people looking for indoor activities and deals.",
+        suggestedAction: "Promote indoor showroom experience and test drives — 'stay dry and find your next car'",
+      },
+      {
+        id: "mom-8",
+        title: "First proper spring day — 18°C across the east coast",
+        triggerType: "weather",
+        popScore: 82,
+        timestamp: "3 hours ago",
+        description: "First warm spring day of the year with 18°C temperatures expected across the east coast of Ireland.",
+        suggestedAction: "Launch spring test drive campaign — get people into convertibles and SUVs while the sun shines",
+      },
+      {
+        id: "mom-9",
+        title: "Meath GAA Senior Football Championship draw announced",
+        triggerType: "sport",
+        popScore: 71,
+        timestamp: "4 hours ago",
+        description: "The Meath GAA Senior Football Championship draw has been announced, generating significant local excitement.",
+        suggestedAction: "Sponsor local GAA content and run community-focused ad tying Tadg Riordan to Meath pride",
+      },
+      {
+        id: "mom-10",
+        title: "Bank Holiday Monday approaching — long weekend ahead",
+        triggerType: "seasonal",
+        popScore: 79,
+        timestamp: "2 hours ago",
+        description: "Bank holiday weekend coming up — families planning activities and outings across the region.",
+        suggestedAction: "Run long weekend showroom event ad with extended opening hours and special finance offers",
+      },
+      {
+        id: "mom-11",
+        title: "Ashbourne food festival this weekend",
+        triggerType: "culture",
+        popScore: 63,
+        timestamp: "5 hours ago",
+        description: "Ashbourne food festival bringing high foot traffic to the town centre this weekend.",
+        suggestedAction: "Partner with festival for branded presence and run localised radio ad welcoming visitors to the area",
+      },
+      {
+        id: "mom-12",
+        title: "New M3 motorway junction opening — showroom 2 mins off exit",
+        triggerType: "news",
+        popScore: 88,
+        timestamp: "30 minutes ago",
+        description: "New M3 motorway junction opening announced — Tadg Riordan's Ashbourne showroom is just 2 minutes from the exit.",
+        suggestedAction: "Run targeted radio and social ads highlighting proximity to the new junction — 'We're just off the M3'",
+      },
     ],
     lastActivity: "2026-03-27",
   },
@@ -174,7 +240,7 @@ export const DEMO_BRANDS: Brand[] = [
     status: "active",
     epAgentId: "ep-hospitality",
     brandAgentId: "brand-napoli-kitchen",
-    logoLine: "Taste the real Napoli",
+    logoLine: "Where every meal is a moment",
     locations: [
       { name: "Napoli's Kitchen Hereford", address: "High Street, Hereford, HR1 2AA" },
     ],
@@ -193,7 +259,13 @@ export const DEMO_BRANDS: Brand[] = [
       brandMusic: "Italian-inspired acoustic guitar melody",
       additionalMusic: ["Evening ambience bed", "Upbeat lunch rush bed"],
       sfx: ["Pizza oven crackle", "Cork pop", "Plate set down"],
-      logoLine: "Taste the real Napoli",
+      logoLine: "Where every meal is a moment",
+    },
+    socialProfile: {
+      tone: "Warm, inviting, passionate about food",
+      hashtags: ["#NapolisKitchen", "#ItalianFood", "#Meath", "#FoodLovers"],
+      imageStyle: "Food photography, restaurant ambiance, family dining",
+      bestPlatforms: ["instagram", "facebook", "tiktok"],
     },
     campaigns: [
       {
@@ -214,6 +286,42 @@ export const DEMO_BRANDS: Brand[] = [
         timestamp: "4 hours ago",
         description: "Rain expected this evening — ideal for cosy restaurant dining.",
         suggestedAction: "Promote warm Italian dining experience for a rainy evening",
+      },
+      {
+        id: "mom-13",
+        title: "Six Nations weekend — Ireland vs England buildup",
+        triggerType: "sport",
+        popScore: 77,
+        timestamp: "2 hours ago",
+        description: "Six Nations rugby fever building ahead of the Ireland vs England clash — massive pub and restaurant footfall expected.",
+        suggestedAction: "Run match-day dining promotion — 'watch the game, enjoy the food' with special pre-match menu",
+      },
+      {
+        id: "mom-14",
+        title: "Ashbourne food festival this weekend",
+        triggerType: "culture",
+        popScore: 91,
+        timestamp: "1 hour ago",
+        description: "Ashbourne food festival this weekend — huge opportunity for food businesses to reach engaged audiences.",
+        suggestedAction: "Feature Napoli's Kitchen at the festival and run social and radio content celebrating local food culture",
+      },
+      {
+        id: "mom-15",
+        title: "Bank Holiday Monday — families looking for dining options",
+        triggerType: "seasonal",
+        popScore: 84,
+        timestamp: "3 hours ago",
+        description: "Bank holiday weekend coming up — families and couples searching for dining out options.",
+        suggestedAction: "Promote Sunday lunch and Monday specials with family-friendly offers and booking incentives",
+      },
+      {
+        id: "mom-16",
+        title: "Local business awards — broadcasting live",
+        triggerType: "news",
+        popScore: 69,
+        timestamp: "6 hours ago",
+        description: "Local business awards being broadcast live — Napoli's Kitchen nominated in the hospitality category.",
+        suggestedAction: "Leverage awards buzz with pride-themed social content and radio mention — 'voted by the community'",
       },
     ],
     lastActivity: "2026-03-25",
@@ -247,6 +355,12 @@ export const DEMO_BRANDS: Brand[] = [
       sfx: ["Car horn honk"],
       logoLine: "Drive home happy",
     },
+    socialProfile: {
+      tone: "Honest, straightforward, value-focused",
+      hashtags: ["#GreenValleyMotors", "#Hereford", "#UsedCars", "#DriveHomeHappy", "#AffordableCars"],
+      imageStyle: "Clean car photography, welcoming forecourt, family-friendly imagery",
+      bestPlatforms: ["facebook", "instagram", "x"],
+    },
     campaigns: [],
     moments: [],
     lastActivity: "2026-03-20",
@@ -260,7 +374,7 @@ export const DEMO_BRANDS: Brand[] = [
     status: "active",
     epAgentId: "ep-financial",
     brandAgentId: "brand-hereford-financial",
-    logoLine: "Your money, our expertise",
+    logoLine: "Your future, secured",
     locations: [
       { name: "Hereford Financial", address: "Bridge Street, Hereford, HR4 9DG" },
     ],
@@ -278,7 +392,13 @@ export const DEMO_BRANDS: Brand[] = [
       brandMusic: "Reassuring piano melody",
       additionalMusic: [],
       sfx: ["Pen on paper", "Keyboard typing"],
-      logoLine: "Your money, our expertise",
+      logoLine: "Your future, secured",
+    },
+    socialProfile: {
+      tone: "Professional, authoritative, reassuring",
+      hashtags: ["#HerefordFinancial", "#FinancialPlanning", "#YourFutureSecured"],
+      imageStyle: "Professional, clean, trust-building",
+      bestPlatforms: ["linkedin", "facebook", "x"],
     },
     campaigns: [
       {
@@ -290,7 +410,44 @@ export const DEMO_BRANDS: Brand[] = [
         status: "active",
       },
     ],
-    moments: [],
+    moments: [
+      {
+        id: "mom-17",
+        title: "Tax year end approaching — April deadline",
+        triggerType: "seasonal",
+        popScore: 86,
+        timestamp: "1 hour ago",
+        description: "UK tax year end on 5th April fast approaching — high interest in ISA and pension top-ups.",
+        suggestedAction: "Run urgent tax year end campaign highlighting ISA allowances and pension contributions before the deadline",
+      },
+      {
+        id: "mom-18",
+        title: "Interest rates announcement expected this week",
+        triggerType: "industry",
+        popScore: 90,
+        timestamp: "2 hours ago",
+        description: "Bank of England interest rate decision expected this week — significant impact on mortgage rates and savings.",
+        suggestedAction: "Position Hereford Financial as the expert guide through rate changes — 'whatever they decide, we'll find you the best deal'",
+      },
+      {
+        id: "mom-19",
+        title: "First-time buyer scheme changes announced",
+        triggerType: "news",
+        popScore: 83,
+        timestamp: "3 hours ago",
+        description: "Government announces changes to first-time buyer mortgage guarantee scheme — major impact on the housing market.",
+        suggestedAction: "Launch first-time buyer campaign explaining the new scheme with a clear call-to-action to book a consultation",
+      },
+      {
+        id: "mom-20",
+        title: "Back to school season — education fund planning",
+        triggerType: "seasonal",
+        popScore: 72,
+        timestamp: "1 day ago",
+        description: "Back to school season prompting parents to think about long-term education fund planning and savings.",
+        suggestedAction: "Promote education savings plans and junior ISAs — 'invest in their future today'",
+      },
+    ],
     lastActivity: "2026-03-26",
   },
   {
@@ -322,6 +479,12 @@ export const DEMO_BRANDS: Brand[] = [
       sfx: ["Water splash", "Bird call", "Paddle stroke"],
       logoLine: "Discover the Wye Valley",
     },
+    socialProfile: {
+      tone: "Adventurous, inspiring, nature-loving",
+      hashtags: ["#WyeValleyTours", "#WyeValley", "#AdventureWaits", "#KayakLife", "#VisitHerefordshire"],
+      imageStyle: "Action shots on water, stunning valley landscapes, happy groups outdoors",
+      bestPlatforms: ["instagram", "tiktok", "facebook"],
+    },
     campaigns: [
       {
         id: "camp-6",
@@ -332,7 +495,35 @@ export const DEMO_BRANDS: Brand[] = [
         status: "scheduled",
       },
     ],
-    moments: [],
+    moments: [
+      {
+        id: "mom-21",
+        title: "Sunny weekend forecast — outdoor activities surge",
+        triggerType: "weather",
+        popScore: 92,
+        timestamp: "1 hour ago",
+        description: "Sunny weekend forecast with clear skies across the Wye Valley — peak conditions for kayaking and guided walks.",
+        suggestedAction: "Launch urgent weekend availability campaign — 'perfect conditions this weekend, book now before spots fill'",
+      },
+      {
+        id: "mom-22",
+        title: "Bank holiday approaching — adventure bookings spike",
+        triggerType: "seasonal",
+        popScore: 85,
+        timestamp: "2 hours ago",
+        description: "Bank holiday weekend approaching — historically the biggest booking period for outdoor adventure activities.",
+        suggestedAction: "Run bank holiday adventure package campaign with group discounts and family bundle offers",
+      },
+      {
+        id: "mom-23",
+        title: "Local tourism awards nominations open",
+        triggerType: "industry",
+        popScore: 67,
+        timestamp: "5 hours ago",
+        description: "Local tourism awards nominations are now open — opportunity to build reputation and community engagement.",
+        suggestedAction: "Run social campaign asking customers to nominate Wye Valley Tours — 'we love what we do, tell them why'",
+      },
+    ],
     lastActivity: "2026-03-24",
   },
 ];
