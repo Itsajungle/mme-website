@@ -45,24 +45,17 @@ export async function POST(request: Request) {
       return Response.json({ error: "No audio segments provided" }, { status: 400 });
     }
 
+    const outDir = "/tmp/mme-audio";
+    await mkdir(outDir, { recursive: true });
+
     const ffmpegPath = await findFfmpeg();
 
     if (!ffmpegPath) {
-      // Return a simulated mix result when FFmpeg isn't available
-      const primaryVoice = segments.find((s) => s.track === "voice");
-      const fallbackUrl = "/api/audio/demo-tone?type=voice&variant=default";
-      return Response.json({
-        mp3Url: primaryVoice?.audioUrl || segments[0]?.audioUrl || fallbackUrl,
-        wavUrl: primaryVoice?.audioUrl || segments[0]?.audioUrl || fallbackUrl,
-        loudness: -23,
-        duration: totalDuration,
-        warning: "FFmpeg not available — using demo audio fallback.",
-        note: "FFmpeg not available — returning primary audio track. Install FFmpeg for full mixing.",
-      });
+      return Response.json(
+        { error: "FFmpeg is not installed. Audio mixing requires FFmpeg. Check nixpacks.toml configuration." },
+        { status: 500 }
+      );
     }
-
-    const outDir = join(process.cwd(), "public", "audio", "mixed");
-    await mkdir(outDir, { recursive: true });
 
     const mixId = randomUUID().slice(0, 8);
 
@@ -70,7 +63,12 @@ export async function POST(request: Request) {
     const resolvedSegments = await Promise.all(
       segments.map(async (seg) => {
         let filePath: string;
-        if (seg.audioUrl.startsWith("/")) {
+        if (seg.audioUrl.startsWith("/api/audio/serve")) {
+          // Extract filename from /api/audio/serve?file=xxx URLs
+          const url = new URL(seg.audioUrl, "http://localhost");
+          const file = url.searchParams.get("file");
+          filePath = file ? join(outDir, file) : seg.audioUrl;
+        } else if (seg.audioUrl.startsWith("/")) {
           filePath = join(process.cwd(), "public", seg.audioUrl);
         } else if (seg.audioUrl.startsWith("http")) {
           const res = await fetch(seg.audioUrl);
@@ -129,7 +127,7 @@ export async function POST(request: Request) {
       await execFileAsync(ffmpegPath, buildArgs(mp3Path, ["-ar", "44100", "-b:a", "320k"]), {
         timeout: 60000,
       });
-      results.mp3Url = `/audio/mixed/${mp3File}`;
+      results.mp3Url = `/api/audio/serve?file=${mp3File}`;
     }
 
     if (outputFormat === "wav" || outputFormat === "both") {
@@ -138,7 +136,7 @@ export async function POST(request: Request) {
       await execFileAsync(ffmpegPath, buildArgs(wavPath, ["-ar", "48000", "-sample_fmt", "s24"]), {
         timeout: 60000,
       });
-      results.wavUrl = `/audio/mixed/${wavFile}`;
+      results.wavUrl = `/api/audio/serve?file=${wavFile}`;
     }
 
     return Response.json({

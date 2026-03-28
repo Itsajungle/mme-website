@@ -72,6 +72,9 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
   const [audioUrl, setAudioUrl] = useState("");
   const [audioGenerated, setAudioGenerated] = useState(false);
   const [selectedVoiceId, setSelectedVoiceId] = useState(brand.audioBrandKit.voiceId);
+  const [musicUrl, setMusicUrl] = useState("");
+  const [sfxUrls, setSfxUrls] = useState<string[]>([]);
+  const [generationError, setGenerationError] = useState("");
 
   const durationSeconds = parseInt(duration) || 30;
 
@@ -110,6 +113,7 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
   const handleGenerateAudio = useCallback(
     async (overrideScript?: string) => {
       const scriptToUse = overrideScript || scriptText;
+      setGenerationError("");
 
       // Extract voice-only text (remove directions)
       const voiceOnlyText = scriptToUse
@@ -121,53 +125,125 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
 
       if (!voiceOnlyText) return;
 
-      // Voice synthesis
+      // Step 1: Voice synthesis (required — blocks on failure)
       setPipelineStep("voice");
+      let voiceUrl: string;
+      let voiceDuration: number;
       try {
         const voiceResult = await engine.generateSpeech(voiceOnlyText, selectedVoiceId);
-        setAudioUrl(voiceResult.url);
+        voiceUrl = voiceResult.url;
+        voiceDuration = voiceResult.duration;
+        setAudioUrl(voiceUrl);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Voice generation failed";
+        setGenerationError(msg);
+        setPipelineStep("idle");
+        return;
+      }
 
-        // Music placement
-        setPipelineStep("music");
-        await new Promise((r) => setTimeout(r, 500));
+      // Step 2: Music generation (non-blocking — continue without if it fails)
+      setPipelineStep("music");
+      let generatedMusicUrl = "";
+      try {
+        const musicRes = await fetch("/api/audio/music-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `Background music bed for a ${tone} ${brand.sectorName} radio ad, ${durationSeconds} seconds, ${brand.name} brand`,
+            durationSeconds: durationSeconds + 4,
+          }),
+        });
+        const musicData = await musicRes.json();
+        if (musicRes.ok && musicData.url) {
+          generatedMusicUrl = musicData.url;
+          setMusicUrl(musicData.url);
+        }
+      } catch {
+        // Music generation failed — continue without music
+      }
 
-        // SFX placement
-        setPipelineStep("sfx");
-        await new Promise((r) => setTimeout(r, 500));
+      // Step 3: SFX generation (non-blocking — continue without if it fails)
+      setPipelineStep("sfx");
+      let generatedSfxUrl = "";
+      try {
+        const sfxRes = await fetch("/api/audio/sfx-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `Sound effect for ${brand.sectorName} ${triggerType} radio ad intro`,
+            durationSeconds: 3,
+          }),
+        });
+        const sfxData = await sfxRes.json();
+        if (sfxRes.ok && sfxData.url) {
+          generatedSfxUrl = sfxData.url;
+          setSfxUrls([sfxData.url]);
+        }
+      } catch {
+        // SFX generation failed — continue without SFX
+      }
 
-        // Mixing
-        setPipelineStep("mixing");
-        try {
-          const mixResult = await engine.mixAudio({
-            segments: [
-              {
-                audioUrl: voiceResult.url,
-                startTime: 3,
-                duration: voiceResult.duration,
-                volume: 100,
-                track: "voice",
-              },
-            ],
-            totalDuration: durationSeconds,
-            loudnessTarget: -23,
-            outputFormat: "both",
+      // Step 4: Mix all tracks together
+      setPipelineStep("mixing");
+      try {
+        const segments: Array<{
+          audioUrl: string;
+          startTime: number;
+          duration: number;
+          volume: number;
+          track: "voice" | "music" | "sfx";
+          ducking?: { underVoice: boolean; duckLevel: number; fadeMs: number };
+        }> = [
+          {
+            audioUrl: voiceUrl,
+            startTime: 2,
+            duration: voiceDuration,
+            volume: 100,
+            track: "voice",
+          },
+        ];
+
+        if (generatedMusicUrl) {
+          segments.push({
+            audioUrl: generatedMusicUrl,
+            startTime: 0,
+            duration: durationSeconds + 4,
+            volume: 15,
+            track: "music",
+            ducking: { underVoice: true, duckLevel: 30, fadeMs: 500 },
           });
-          if (mixResult.mp3Url) {
-            setAudioUrl(mixResult.mp3Url);
-          }
-        } catch {
-          // Mix failed, use voice-only audio
         }
 
-        setAudioGenerated(true);
-        setPipelineStep("complete");
-      } catch {
-        // Voice generation failed (probably no API key) — show demo state
-        setPipelineStep("complete");
-        setAudioGenerated(true);
+        if (generatedSfxUrl) {
+          segments.push({
+            audioUrl: generatedSfxUrl,
+            startTime: 0.5,
+            duration: 3,
+            volume: 50,
+            track: "sfx",
+          });
+        }
+
+        const mixResult = await engine.mixAudio({
+          segments,
+          totalDuration: durationSeconds,
+          loudnessTarget: -23,
+          outputFormat: "both",
+        });
+
+        if (mixResult.mp3Url) {
+          setAudioUrl(mixResult.mp3Url);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Audio mixing failed";
+        setGenerationError(msg);
+        // Voice-only audio is still set from step 1
       }
+
+      setAudioGenerated(true);
+      setPipelineStep("complete");
     },
-    [scriptText, selectedVoiceId, engine, durationSeconds]
+    [scriptText, selectedVoiceId, engine, durationSeconds, brand, tone, triggerType]
   );
 
   return (
@@ -211,6 +287,17 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
           <span className="text-sm font-medium text-text">
             {PIPELINE_LABELS[pipelineStep]}
           </span>
+        </motion.div>
+      )}
+
+      {/* Generation Error */}
+      {generationError && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/5 px-5 py-3"
+        >
+          <span className="text-sm font-medium text-red-400">{generationError}</span>
         </motion.div>
       )}
 
