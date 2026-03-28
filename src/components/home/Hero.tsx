@@ -67,7 +67,7 @@ function MomentPulse() {
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 100) {
             const alpha = (1 - dist / 100) * 0.15;
-            ctx.strokeStyle = `rgba(245, 158, 11, ${alpha})`;
+            ctx.strokeStyle = `rgba(0, 255, 150, ${alpha})`;
             ctx.lineWidth = 0.5;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
@@ -85,7 +85,7 @@ function MomentPulse() {
         p.life++;
         const lifeRatio = p.life / p.maxLife;
         const alpha = lifeRatio < 0.1 ? lifeRatio * 10 : lifeRatio > 0.9 ? (1 - lifeRatio) * 10 : 1;
-        ctx.fillStyle = `rgba(245, 158, 11, ${alpha * 0.6})`;
+        ctx.fillStyle = `rgba(0, 255, 150, ${alpha * 0.6})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
@@ -97,7 +97,7 @@ function MomentPulse() {
         const pulse = pulses[i];
         pulse.radius += 1;
         pulse.opacity *= 0.985;
-        ctx.strokeStyle = `rgba(245, 158, 11, ${pulse.opacity})`;
+        ctx.strokeStyle = `rgba(0, 255, 150, ${pulse.opacity})`;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(pulse.x, pulse.y, pulse.radius, 0, Math.PI * 2);
@@ -132,7 +132,7 @@ export function Hero() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.06) 0%, transparent 60%)",
+            "radial-gradient(ellipse at 50% 0%, rgba(0, 255, 150, 0.06) 0%, transparent 60%)",
         }}
       />
 

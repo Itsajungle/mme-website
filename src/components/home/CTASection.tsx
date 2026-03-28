@@ -12,7 +12,7 @@ export function CTASection() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 50%, rgba(245, 158, 11, 0.04) 0%, transparent 60%)",
+            "radial-gradient(ellipse at 50% 50%, rgba(0, 255, 150, 0.04) 0%, transparent 60%)",
         }}
       />
 

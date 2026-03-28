@@ -3,14 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogIn, LayoutDashboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NAV_LINKS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { isAuthenticated } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-bg/80 backdrop-blur-xl">
@@ -43,12 +45,31 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/demo"
-              className="hidden sm:inline-flex items-center px-4 py-2 text-sm font-medium rounded-[var(--radius)] bg-accent text-bg hover:bg-accent-hover transition-colors"
-            >
-              Book a Demo
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-[var(--radius)] bg-accent text-bg hover:bg-accent-hover transition-colors"
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-[var(--radius)] border border-accent/30 text-accent hover:bg-accent/10 transition-colors"
+                >
+                  <LogIn size={16} />
+                  Client Login
+                </Link>
+                <Link
+                  href="/demo"
+                  className="hidden sm:inline-flex items-center px-4 py-2 text-sm font-medium rounded-[var(--radius)] bg-accent text-bg hover:bg-accent-hover transition-colors"
+                >
+                  Book a Demo
+                </Link>
+              </>
+            )}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden p-2 text-text-secondary hover:text-text"
@@ -84,13 +105,32 @@ export function Header() {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                href="/demo"
-                onClick={() => setMobileOpen(false)}
-                className="block px-3 py-2 text-sm font-medium text-accent"
-              >
-                Book a Demo
-              </Link>
+              {isAuthenticated ? (
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-3 py-2 text-sm font-medium text-accent"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2 text-sm font-medium text-accent"
+                  >
+                    Client Login
+                  </Link>
+                  <Link
+                    href="/demo"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2 text-sm font-medium text-accent"
+                  >
+                    Book a Demo
+                  </Link>
+                </>
+              )}
             </nav>
           </motion.div>
         )}
