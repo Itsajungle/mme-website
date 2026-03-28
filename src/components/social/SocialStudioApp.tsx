@@ -333,7 +333,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
       });
       if (!res.ok) throw new Error("Video generation failed");
       const data = await res.json();
-      setGeneratedVideoUrl(data.url ?? null);
+      setGeneratedVideoUrl(data.videoUrl ?? data.url ?? null);
       setGeneratedAudioUrl(data.audioUrl ?? null);
       setPipelineStatus("review");
     } catch {

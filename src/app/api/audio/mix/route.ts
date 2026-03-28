@@ -50,11 +50,13 @@ export async function POST(request: Request) {
     if (!ffmpegPath) {
       // Return a simulated mix result when FFmpeg isn't available
       const primaryVoice = segments.find((s) => s.track === "voice");
+      const fallbackUrl = "/api/audio/demo-tone?type=voice&variant=default";
       return Response.json({
-        mp3Url: primaryVoice?.audioUrl || segments[0]?.audioUrl || "",
-        wavUrl: primaryVoice?.audioUrl || segments[0]?.audioUrl || "",
+        mp3Url: primaryVoice?.audioUrl || segments[0]?.audioUrl || fallbackUrl,
+        wavUrl: primaryVoice?.audioUrl || segments[0]?.audioUrl || fallbackUrl,
         loudness: -23,
         duration: totalDuration,
+        warning: "FFmpeg not available — using demo audio fallback.",
         note: "FFmpeg not available — returning primary audio track. Install FFmpeg for full mixing.",
       });
     }

@@ -148,7 +148,7 @@ async function generateWithDallE(
 
 // ─── Image download and save ──────────────────────────────────────────────────
 
-const GENERATED_DIR = path.join(process.cwd(), "public", "images", "generated");
+const GENERATED_DIR = "/tmp/mme-images";
 
 function ensureGeneratedDir(): void {
   if (!fs.existsSync(GENERATED_DIR)) {
@@ -162,21 +162,30 @@ async function downloadAndSave(imageUrl: string, brandSlug: string, platform: st
   const timestamp = Date.now();
   const filename = `${brandSlug}-${platform}-${timestamp}.jpg`;
   const localPath = path.join(GENERATED_DIR, filename);
-  const publicPath = `/images/generated/${filename}`;
-
   const res = await fetch(imageUrl);
   if (!res.ok) throw new Error(`Failed to download generated image: ${res.status}`);
 
   const buffer = Buffer.from(await res.arrayBuffer());
   fs.writeFileSync(localPath, buffer);
 
-  return publicPath;
+  // Return API serve URL instead of static path (Docker can't serve runtime files from public/)
+  return `/api/images/serve?file=${filename}`;
 }
 
 // ─── Placeholder path ─────────────────────────────────────────────────────────
 
 function getPlaceholderPath(platform: string): string {
-  return `/images/placeholders/social-${platform.toLowerCase()}.jpg`;
+  // Return inline SVG placeholder — avoids dependency on files that may not exist in Docker
+  const colors: Record<string, string> = {
+    instagram: "%23e1306c",
+    facebook: "%231877f2",
+    linkedin: "%230077b5",
+    x: "%23999999",
+    tiktok: "%23ff0050",
+    video: "%2300FF96",
+  };
+  const color = colors[platform.toLowerCase()] ?? "%2300FF96";
+  return `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800' viewBox='0 0 800 800'><rect fill='${color}' width='800' height='800' opacity='0.15'/><text x='400' y='400' text-anchor='middle' dominant-baseline='middle' fill='${color}' font-size='32' font-family='sans-serif'>MME · ${platform}</text></svg>`;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

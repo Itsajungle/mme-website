@@ -67,14 +67,14 @@ export async function POST(request: Request) {
     const duration = Math.max(5, Math.round((wordCount / 130) * 60));
 
     if (!imageUrl && !audioUrl) {
-      // Neither API configured — return placeholder
+      // Neither API configured — return demo fallbacks instead of null
       return Response.json({
-        videoUrl: null,
-        audioUrl: null,
+        videoUrl: "/api/audio/demo-tone?type=music&variant=upbeat",
+        audioUrl: "/api/audio/demo-tone?type=voice&variant=default",
         thumbnailUrl: null,
         duration,
-        status: "placeholder",
-        message: "Video generation not configured. Provide API credentials to enable.",
+        status: "demo",
+        message: "Video generation not configured. Showing demo preview.",
       });
     }
 

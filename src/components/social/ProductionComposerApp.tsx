@@ -101,6 +101,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [composedUrl, setComposedUrl] = useState<string | null>(null);
   const [composedAudioUrl, setComposedAudioUrl] = useState<string | null>(null);
   const [publishDone, setPublishDone] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const updateClip = (id: string, patch: Partial<ClipItem>) =>
     setClips((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
@@ -177,8 +178,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         });
         const data = await res.json();
         imageUrl = data?.url;
-      } catch {
-        // continue without image
+      } catch (err) {
+        console.error("Image generation failed:", err);
+        setErrorMessage("Image generation failed. Continuing without image.");
       }
 
       // Step 2: Generate voice
@@ -196,8 +198,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         });
         const data = await res.json();
         audioUrl = data?.audioUrl ?? data?.url;
-      } catch {
-        // continue without audio
+      } catch (err) {
+        console.error("Voice generation failed:", err);
+        setErrorMessage("Voice generation failed. Continuing without audio.");
       }
 
       updateClip(clip.id, { status: "complete", imageUrl, audioUrl });
@@ -243,8 +246,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       // Use the first clip's image as the composition thumbnail
       const firstImage = clips.find((c) => c.imageUrl)?.imageUrl ?? null;
       setComposedUrl(firstImage);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("Audio composition failed:", err);
+      setErrorMessage("Audio composition failed. Please try again.");
     }
     setIsComposing(false);
   };
@@ -275,8 +279,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         }),
       });
       setPublishDone(true);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("Publishing failed:", err);
+      setErrorMessage("Publishing failed. Please try again.");
     }
     setIsPublishing(false);
   };
@@ -286,6 +291,20 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
 
   return (
     <div className="rounded-2xl border border-border bg-bg-card overflow-hidden">
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="flex items-start gap-2 mx-6 mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5">
+          <span className="text-red-400 mt-0.5 shrink-0 text-sm">⚠</span>
+          <p className="flex-1 text-xs text-red-300">{errorMessage}</p>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-red-400 hover:text-red-200 transition-colors text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10">

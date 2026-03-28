@@ -105,8 +105,9 @@ export async function GET(request: NextRequest) {
   }
 
   const wav = generateToneWav(toneConfig.freq, toneConfig.duration);
+  const body = wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength) as ArrayBuffer;
 
-  return new Response(wav, {
+  return new Response(body, {
     headers: {
       "Content-Type": "audio/wav",
       "Content-Length": String(wav.length),
