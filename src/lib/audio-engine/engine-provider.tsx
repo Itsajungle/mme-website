@@ -42,20 +42,20 @@ const MOCK_VOICES: VoiceProfile[] = [
 ];
 
 const MOCK_SFX: SoundEffect[] = [
-  { id: "mock-sfx-1", name: "Car Engine Start", description: "Smooth car engine starting", tags: ["car", "engine", "motoring"], duration: 2.5, previewUrl: "" },
-  { id: "mock-sfx-2", name: "Cash Register", description: "Classic cash register ding", tags: ["retail", "shopping"], duration: 1.0, previewUrl: "" },
-  { id: "mock-sfx-3", name: "Restaurant Ambience", description: "Warm restaurant background", tags: ["hospitality", "dining"], duration: 5.0, previewUrl: "" },
-  { id: "mock-sfx-4", name: "Crowd Cheering", description: "Enthusiastic crowd cheer", tags: ["sport", "crowd"], duration: 3.0, previewUrl: "" },
-  { id: "mock-sfx-5", name: "Door Close", description: "Car door closing", tags: ["car", "door"], duration: 1.0, previewUrl: "" },
-  { id: "mock-sfx-6", name: "Keys Jingle", description: "Car keys jingling", tags: ["keys", "motoring"], duration: 1.5, previewUrl: "" },
+  { id: "mock-sfx-1", name: "Car Engine Start", description: "Smooth car engine starting", tags: ["car", "engine", "motoring"], duration: 2.5, previewUrl: "/api/audio/demo-tone?type=sfx&variant=whoosh" },
+  { id: "mock-sfx-2", name: "Cash Register", description: "Classic cash register ding", tags: ["retail", "shopping"], duration: 1.0, previewUrl: "/api/audio/demo-tone?type=sfx&variant=ding" },
+  { id: "mock-sfx-3", name: "Restaurant Ambience", description: "Warm restaurant background", tags: ["hospitality", "dining"], duration: 5.0, previewUrl: "/api/audio/demo-tone?type=sfx&variant=default" },
+  { id: "mock-sfx-4", name: "Crowd Cheering", description: "Enthusiastic crowd cheer", tags: ["sport", "crowd"], duration: 3.0, previewUrl: "/api/audio/demo-tone?type=sfx&variant=default" },
+  { id: "mock-sfx-5", name: "Door Close", description: "Car door closing", tags: ["car", "door"], duration: 1.0, previewUrl: "/api/audio/demo-tone?type=sfx&variant=beep" },
+  { id: "mock-sfx-6", name: "Keys Jingle", description: "Car keys jingling", tags: ["keys", "motoring"], duration: 1.5, previewUrl: "/api/audio/demo-tone?type=sfx&variant=ding" },
 ];
 
 const MOCK_MUSIC: MusicTrack[] = [
-  { id: "mock-music-1", name: "Feel-Good Driving", artist: "MME Library", duration: 30, tags: ["upbeat", "driving"], mood: "upbeat", streamUrl: "", license: "MME Licensed" },
-  { id: "mock-music-2", name: "Morning Sunshine", artist: "MME Library", duration: 30, tags: ["warm", "happy"], mood: "warm", streamUrl: "", license: "MME Licensed" },
-  { id: "mock-music-3", name: "Corporate Trust", artist: "MME Library", duration: 30, tags: ["corporate", "professional"], mood: "premium", streamUrl: "", license: "MME Licensed" },
-  { id: "mock-music-4", name: "Weekend Vibes", artist: "MME Library", duration: 30, tags: ["relaxed", "acoustic"], mood: "relaxed", streamUrl: "", license: "MME Licensed" },
-  { id: "mock-music-5", name: "Action Sports", artist: "MME Library", duration: 30, tags: ["energetic", "dynamic"], mood: "urgent", streamUrl: "", license: "MME Licensed" },
+  { id: "mock-music-1", name: "Feel-Good Driving", artist: "MME Library", duration: 30, tags: ["upbeat", "driving"], mood: "upbeat", streamUrl: "/api/audio/demo-tone?type=music&variant=upbeat", license: "MME Licensed" },
+  { id: "mock-music-2", name: "Morning Sunshine", artist: "MME Library", duration: 30, tags: ["warm", "happy"], mood: "warm", streamUrl: "/api/audio/demo-tone?type=music&variant=relaxed", license: "MME Licensed" },
+  { id: "mock-music-3", name: "Corporate Trust", artist: "MME Library", duration: 30, tags: ["corporate", "professional"], mood: "premium", streamUrl: "/api/audio/demo-tone?type=music&variant=premium", license: "MME Licensed" },
+  { id: "mock-music-4", name: "Weekend Vibes", artist: "MME Library", duration: 30, tags: ["relaxed", "acoustic"], mood: "relaxed", streamUrl: "/api/audio/demo-tone?type=music&variant=relaxed", license: "MME Licensed" },
+  { id: "mock-music-5", name: "Action Sports", artist: "MME Library", duration: 30, tags: ["energetic", "dynamic"], mood: "urgent", streamUrl: "/api/audio/demo-tone?type=music&variant=dramatic", license: "MME Licensed" },
 ];
 
 async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {

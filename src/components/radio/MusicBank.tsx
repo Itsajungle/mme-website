@@ -58,6 +58,7 @@ export function MusicBank({ brandName, savedTracks = [], onAddTrack }: MusicBank
   const [libraryResults, setLibraryResults] = useState<MusicTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Generation state
@@ -95,11 +96,23 @@ export function MusicBank({ brandName, savedTracks = [], onAddTrack }: MusicBank
       setPlayingId(null);
       return;
     }
+    if (!url) {
+      setError("No audio URL available for this track");
+      return;
+    }
     if (audioRef.current) audioRef.current.pause();
+    setError(null);
     const audio = new Audio(url);
     audioRef.current = audio;
     audio.onended = () => setPlayingId(null);
-    audio.play();
+    audio.onerror = () => {
+      setError(`Failed to load audio: ${url}`);
+      setPlayingId(null);
+    };
+    audio.play().catch((err) => {
+      setError(`Playback failed: ${err.message}`);
+      setPlayingId(null);
+    });
     setPlayingId(id);
   }
 
@@ -115,6 +128,14 @@ export function MusicBank({ brandName, savedTracks = [], onAddTrack }: MusicBank
           <p className="text-sm text-text-muted">Browse and generate music for {brandName}</p>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-400">
+          <span className="font-medium">Audio Error:</span> {error}
+          <button onClick={() => setError(null)} className="ml-2 text-red-300 hover:text-red-200 underline text-xs">dismiss</button>
+        </div>
+      )}
 
       {/* Brand Music Section */}
       {savedTracks.length > 0 && (

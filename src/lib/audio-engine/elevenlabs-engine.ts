@@ -28,12 +28,14 @@ async function saveAudioFile(
   prefix: string,
   ext: string = "mp3"
 ): Promise<{ url: string; filename: string }> {
-  const dir = join(process.cwd(), "public", "audio", "generated");
+  // Save to /tmp which is always writable in Docker containers
+  // Serve via /api/audio/serve?file= route instead of public/ static files
+  const dir = "/tmp/mme-audio";
   await mkdir(dir, { recursive: true });
   const filename = `${prefix}-${randomUUID().slice(0, 8)}.${ext}`;
   const filepath = join(dir, filename);
   await writeFile(filepath, Buffer.from(buffer));
-  return { url: `/audio/generated/${filename}`, filename };
+  return { url: `/api/audio/serve?file=${filename}`, filename };
 }
 
 // Irish/UK accent keywords for filtering

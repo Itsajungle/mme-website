@@ -51,6 +51,7 @@ export function VoiceBank({
   const [previewCache, setPreviewCache] = useState<Record<string, string>>({});
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Voice settings
@@ -94,8 +95,9 @@ export function VoiceBank({
         return;
       }
 
-      // Generate preview
+      // Generate preview via TTS
       setPlayingId(voice.id);
+      setError(null);
       try {
         const isIrish = voice.tags.includes("irish");
         const phrases = isIrish ? IRISH_SAMPLE_PHRASES : GENERAL_SAMPLE_PHRASES;
@@ -104,8 +106,11 @@ export function VoiceBank({
         const result = await engine.generateSpeech(phrase, voice.id, settings);
         setPreviewCache((prev) => ({ ...prev, [voice.id]: result.url }));
         playAudio(result.url, voice.id);
-      } catch {
+      } catch (err) {
         setPlayingId(null);
+        const msg = err instanceof Error ? err.message : "Voice preview failed";
+        setError(msg);
+        console.error("[VoiceBank] Preview error:", msg);
       }
     },
     [playingId, previewCache, engine, settings]
@@ -115,10 +120,24 @@ export function VoiceBank({
     if (audioRef.current) {
       audioRef.current.pause();
     }
+    if (!url) {
+      setError("No audio URL returned from server");
+      setPlayingId(null);
+      return;
+    }
     const audio = new Audio(url);
     audioRef.current = audio;
     audio.onended = () => setPlayingId(null);
-    audio.play();
+    audio.onerror = (e) => {
+      console.error("[VoiceBank] Audio playback error:", e);
+      setError(`Failed to play audio from: ${url}`);
+      setPlayingId(null);
+    };
+    audio.play().catch((err) => {
+      console.error("[VoiceBank] Audio play() rejected:", err);
+      setError(`Playback blocked: ${err.message}`);
+      setPlayingId(null);
+    });
     setPlayingId(voiceId);
   }
 
@@ -185,6 +204,14 @@ export function VoiceBank({
           className="w-full rounded-lg border border-border bg-bg-input pl-10 pr-4 py-2.5 text-sm text-text placeholder:text-text-muted focus:border-border-focus focus:outline-none"
         />
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-400">
+          <span className="font-medium">Audio Error:</span> {error}
+          <button onClick={() => setError(null)} className="ml-2 text-red-300 hover:text-red-200 underline text-xs">dismiss</button>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
