@@ -118,9 +118,9 @@ export const VERTICALS = {
 
 export const STATS = [
   { value: 747, suffix: "m", prefix: "£", label: "UK radio advertising market" },
-  { value: 50, suffix: "m", label: "Weekly UK radio listeners" },
-  { value: 36, suffix: "m", label: "UK social media users" },
-  { value: 0, suffix: "", label: "Competitors bridging radio + social AI", prefix: "", display: "0" },
+  { value: 50, suffix: "m", prefix: "", label: "Weekly UK radio listeners" },
+  { value: 36, suffix: "m", prefix: "", label: "UK social media users" },
+  { value: 0, suffix: "", prefix: "", label: "Competitors bridging radio + social AI" },
 ] as const;
 
 export const USE_CASES = [
