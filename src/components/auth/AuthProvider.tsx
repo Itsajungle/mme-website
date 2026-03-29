@@ -20,6 +20,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => string | null;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AUTH_STORAGE_KEY = "mme_auth";
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<Client | null>(null);
   const [brandClient, setBrandClient] = useState<BrandClientUser | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -77,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       localStorage.removeItem(AUTH_STORAGE_KEY);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -120,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         isAuthenticated: !!client || !!brandClient,
+        isLoading,
       }}
     >
       {children}

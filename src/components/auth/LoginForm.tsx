@@ -10,19 +10,19 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { login, isAuthenticated, role, brandClient } = useAuth();
+  const { login, isAuthenticated, isLoading, role, brandClient } = useAuth();
   const router = useRouter();
 
   // Route after login based on role
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
       if (role === "brand-client" && brandClient) {
         router.push(`/portal/${brandClient.brandSlug}`);
       } else {
         router.push("/dashboard");
       }
     }
-  }, [isAuthenticated, role, brandClient, router]);
+  }, [isAuthenticated, isLoading, role, brandClient, router]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
