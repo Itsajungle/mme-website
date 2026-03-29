@@ -9,6 +9,7 @@ import {
   Sparkles,
   Volume2,
   Loader2,
+  Music,
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import { generateScript, type GeneratedScript } from "@/lib/audio-engine/script-
 import { ScriptEditor } from "./ScriptEditor";
 import { AudioPreview } from "./AudioPreview";
 import { ComProdScore } from "./ComProdScore";
+import type { TimelineSegment } from "./ProductionTimeline";
 
 const TRIGGER_TYPES = [
   "Weather", "Sport", "News", "Culture", "Traffic", "Seasonal", "Industry", "Breaking",
@@ -31,6 +33,29 @@ const TONES = [
   { key: "professional", label: "Professional" },
   { key: "humorous", label: "Humorous" },
   { key: "emotional", label: "Emotional" },
+] as const;
+
+// Irish voice roster for pilot — ElevenLabs voices
+const VOICE_ROSTER = [
+  { id: "mFgXOmlOfXfr6suoQkRH", name: "Frances", description: "Soft, warm, calm Irish accent", gender: "female" },
+  { id: "3b8fXc91YHS1i2DYAlBQ", name: "Laura", description: "Warm, articulate Irish female", gender: "female" },
+  { id: "SpA6eNczAK7oucJPiPpw", name: "Beckie", description: "Mature, gentle Irish female", gender: "female" },
+  { id: "1OYA2kgM85gF2eGN8HEp", name: "Colleen", description: "Warm southern Irish woman", gender: "female" },
+  { id: "EfdW5L7xDpYTHDlIRmg9", name: "Aisling", description: "Young Irish female, calm & informative", gender: "female" },
+  { id: "1e9Gn3OQenGu4rjQ3Du1", name: "Niamh", description: "Young Irish female, soft & friendly", gender: "female" },
+  { id: "sgk995upfe3tYLvoGcBN", name: "Labhaoise", description: "Casual Irish woman, warm & grounded", gender: "female" },
+  { id: "rdEILoSxdT6xKDZ56abJ", name: "Isla Wilde", description: "Gentle, soft neutral Irish accent", gender: "female" },
+  { id: "Qrq52PIvoZXeAbdtAugP", name: "Susan", description: "Cloned voice — Sunshine 106.8", gender: "female" },
+  { id: "2WvAXMgrakBkapSmnlv7", name: "Flynn", description: "Natural, crisp neutral Irish", gender: "male" },
+  { id: "8SNzJpKT62Cqqqe8Injx", name: "Michael", description: "Soft Irish male, melodic & soothing", gender: "male" },
+  { id: "zpnRoleXRhWcv8KmQc0N", name: "James Fitzgerald", description: "Middle-aged Irish, clear baritone", gender: "male" },
+  { id: "RlSVB64yXMZJjq67jbB1", name: "Bren", description: "Calm conversational Irish male", gender: "male" },
+  { id: "5OgOMFAcpSKqVQHHQHrU", name: "Thomas", description: "West of Ireland, enthusiastic narration", gender: "male" },
+  { id: "huSf6WJX1X9lGY6I9CfQ", name: "Stephen", description: "Calm, versatile Irish narrator", gender: "male" },
+  { id: "9TYDukkUVpJPDSIuv3ir", name: "Darren", description: "Calm masculine Irish, cinematic", gender: "male" },
+  { id: "7nDsTGv9cjBVU2m1OA8F", name: "Paul", description: "Irish broadcaster, DJ-style delivery", gender: "male" },
+  { id: "1yDXKNtyiAtDljYHKmZy", name: "Paddy Irishman", description: "Middle-aged Irish, nostalgic character", gender: "male" },
+  { id: "B5jEZPqk2OJ2vkPw3wBM", name: "Cillian", description: "Cloned voice — Irish male", gender: "male" },
 ] as const;
 
 type Tone = typeof TONES[number]["key"];
@@ -51,9 +76,10 @@ const PIPELINE_LABELS: Record<PipelineStep, string> = {
 interface RadioAdGeneratorProps {
   brand: Brand;
   mode: "automated" | "hybrid";
+  onAudioGenerated?: (segments: TimelineSegment[], duration: string) => void;
 }
 
-export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
+export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGeneratorProps) {
   const engine = useAudioEngine();
 
   // Step wizard state
@@ -71,12 +97,78 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
   const [scriptApproved, setScriptApproved] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioGenerated, setAudioGenerated] = useState(false);
-  const [selectedVoiceId, setSelectedVoiceId] = useState(brand.audioBrandKit.voiceId);
+  const [selectedVoiceId, setSelectedVoiceId] = useState(
+    VOICE_ROSTER.some(v => v.id === brand.audioBrandKit.voiceId)
+      ? brand.audioBrandKit.voiceId
+      : VOICE_ROSTER[12].id // Default to Bren (confirmed working)
+  );
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [musicUrl, setMusicUrl] = useState("");
   const [sfxUrls, setSfxUrls] = useState<string[]>([]);
   const [generationError, setGenerationError] = useState("");
 
+  // Music & SFX selection (hybrid mode)
+  const MUSIC_MOODS = [
+    { key: "upbeat", label: "Upbeat", desc: "Feel-good, energetic" },
+    { key: "warm", label: "Warm", desc: "Friendly, acoustic" },
+    { key: "corporate", label: "Corporate", desc: "Professional, confident" },
+    { key: "dramatic", label: "Dramatic", desc: "Cinematic, powerful" },
+    { key: "relaxed", label: "Relaxed", desc: "Easy-going, mellow" },
+  ];
+  const [musicMood, setMusicMood] = useState("upbeat");
+  const [musicPreviewUrl, setMusicPreviewUrl] = useState("");
+  const [musicPreviewLoading, setMusicPreviewLoading] = useState(false);
+  const [selectedSfx, setSelectedSfx] = useState<string[]>(brand.audioBrandKit.sfx?.slice(0, 2) || []);
+  const [sfxPreviews, setSfxPreviews] = useState<Record<string, string>>({});
+  const [sfxPreviewLoading, setSfxPreviewLoading] = useState<string | null>(null);
+
   const durationSeconds = parseInt(duration) || 30;
+
+  // Preview music bed
+  const handlePreviewMusic = useCallback(async () => {
+    setMusicPreviewLoading(true);
+    try {
+      const res = await fetch("/api/audio/music-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: "Instrumental background music bed, no vocals, no singing, " + musicMood + " mood, for a " + tone + " " + brand.sectorName + " radio ad, 15 seconds,  mood, gentle underscore",
+          durationSeconds: 15,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setMusicPreviewUrl(data.url);
+        setMusicUrl(data.url);
+        const audio = new Audio(data.url);
+        audio.play().catch(() => {});
+        setTimeout(() => audio.pause(), 12000);
+      }
+    } catch { /* silent */ }
+    setMusicPreviewLoading(false);
+  }, [musicMood, tone, brand.sectorName]);
+
+  // Preview SFX
+  const handlePreviewSfx = useCallback(async (sfxName: string) => {
+    setSfxPreviewLoading(sfxName);
+    try {
+      const res = await fetch("/api/audio/sfx-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: sfxName + " sound effect for radio ad",
+          durationSeconds: 3,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setSfxPreviews((prev: Record<string, string>) => ({ ...prev, [sfxName]: data.url }));
+        const audio = new Audio(data.url);
+        audio.play().catch(() => {});
+      }
+    } catch { /* silent */ }
+    setSfxPreviewLoading(null);
+  }, []);
 
   // Generate script
   const handleGenerateScript = useCallback(() => {
@@ -135,7 +227,11 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
         voiceDuration = voiceResult.duration;
         setAudioUrl(voiceUrl);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Voice generation failed";
+        console.error('[RadioAdGenerator] Voice gen error:', err);
+        console.error('[RadioAdGenerator] Error type:', typeof err, 'isError:', err instanceof Error);
+        console.error('[RadioAdGenerator] selectedVoiceId:', selectedVoiceId);
+        console.error('[RadioAdGenerator] voiceOnlyText length:', typeof voiceOnlyText !== 'undefined' ? voiceOnlyText?.length : 'N/A');
+        const msg = err instanceof Error ? err.message : (typeof err === 'string' ? err : 'Voice generation failed: ' + JSON.stringify(err));
         setGenerationError(msg);
         setPipelineStep("idle");
         return;
@@ -149,7 +245,7 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: `Background music bed for a ${tone} ${brand.sectorName} radio ad, ${durationSeconds} seconds, ${brand.name} brand`,
+            prompt: `Instrumental background music bed, no vocals, no singing, for a ${tone} ${brand.sectorName} radio ad, ${durationSeconds} seconds, gentle underscore`,
             durationSeconds: durationSeconds + 4,
           }),
         });
@@ -170,7 +266,7 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: `Sound effect for ${brand.sectorName} ${triggerType} radio ad intro`,
+            prompt: `${selectedSfx[0] || brand.sectorName} sound effect for radio ad`,
             durationSeconds: 3,
           }),
         });
@@ -208,9 +304,9 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
             audioUrl: generatedMusicUrl,
             startTime: 0,
             duration: durationSeconds + 4,
-            volume: 15,
+            volume: 40,
             track: "music",
-            ducking: { underVoice: true, duckLevel: 30, fadeMs: 500 },
+            ducking: { underVoice: true, duckLevel: 50, fadeMs: 500 },
           });
         }
 
@@ -228,7 +324,7 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
           segments,
           totalDuration: durationSeconds,
           loudnessTarget: -23,
-          outputFormat: "both",
+          outputFormat: "mp3",
         });
 
         if (mixResult.mp3Url) {
@@ -471,6 +567,185 @@ export function RadioAdGenerator({ brand, mode }: RadioAdGeneratorProps) {
               ))}
             </div>
           </div>
+
+          {/* Voice Selection */}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-text">
+              <Volume2 size={14} className="inline mr-1.5 text-accent" />
+              Voice
+            </label>
+            <div className="relative">
+              <button
+                onClick={() => setVoiceOpen(!voiceOpen)}
+                className="flex w-full items-center justify-between rounded-lg border border-border bg-bg-input px-4 py-3 text-sm text-text hover:border-border-hover transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-text">
+                    {VOICE_ROSTER.find(v => v.id === selectedVoiceId)?.name || "Select voice..."}
+                  </span>
+                  <span className="text-xs text-text-muted">
+                    {VOICE_ROSTER.find(v => v.id === selectedVoiceId)?.description}
+                  </span>
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={cn("text-text-muted transition-transform", voiceOpen && "rotate-180")}
+                />
+              </button>
+              <AnimatePresence>
+                {voiceOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-border bg-bg-card shadow-xl"
+                  >
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-muted border-b border-border">
+                      Female Voices
+                    </div>
+                    {VOICE_ROSTER.filter(v => v.gender === "female").map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setSelectedVoiceId(v.id);
+                          setVoiceOpen(false);
+                          if (step === 3) setStep(4);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors",
+                          selectedVoiceId === v.id
+                            ? "bg-accent/10 text-accent"
+                            : "text-text-secondary hover:bg-bg-card-hover hover:text-text"
+                        )}
+                      >
+                        <span className="font-medium">{v.name}</span>
+                        <span className="text-xs text-text-muted">{v.description}</span>
+                      </button>
+                    ))}
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-text-muted border-b border-t border-border">
+                      Male Voices
+                    </div>
+                    {VOICE_ROSTER.filter(v => v.gender === "male").map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setSelectedVoiceId(v.id);
+                          setVoiceOpen(false);
+                          if (step === 3) setStep(4);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors",
+                          selectedVoiceId === v.id
+                            ? "bg-accent/10 text-accent"
+                            : "text-text-secondary hover:bg-bg-card-hover hover:text-text"
+                        )}
+                      >
+                        <span className="font-medium">{v.name}</span>
+                        <span className="text-xs text-text-muted">{v.description}</span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        
+          {/* Music Bed Selection (Hybrid) */}
+          {mode === "hybrid" && (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">
+                <Music size={14} className="inline mr-1.5 text-blue-400" />
+                Music Bed
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {MUSIC_MOODS.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => { setMusicMood(m.key); setMusicPreviewUrl(""); }}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-sm transition-all",
+                      musicMood === m.key
+                        ? "border-blue-500 bg-blue-500/10 text-blue-400"
+                        : "border-border text-text-muted hover:border-border-hover hover:text-text"
+                    )}
+                  >
+                    <span className="font-medium">{m.label}</span>
+                    <span className="text-xs text-text-muted ml-1">{m.desc}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={handlePreviewMusic}
+                disabled={musicPreviewLoading}
+                className="mt-2 flex items-center gap-1.5 rounded-lg border border-blue-500/30 px-3 py-1.5 text-xs text-blue-400 hover:bg-blue-500/5 transition-colors disabled:opacity-50"
+              >
+                {musicPreviewLoading ? (
+                  <><Loader2 size={12} className="animate-spin" /> Generating...</>
+                ) : musicPreviewUrl ? (
+                  <><Volume2 size={12} /> Regenerate Preview</>
+                ) : (
+                  <><Volume2 size={12} /> Preview Music</>
+                )}
+              </button>
+              {musicPreviewUrl && (
+                <p className="mt-1 text-[10px] text-accent font-mono">Music bed ready</p>
+              )}
+            </div>
+          )}
+
+          {/* SFX Selection (Hybrid) */}
+          {mode === "hybrid" && brand.audioBrandKit.sfx && brand.audioBrandKit.sfx.length > 0 && (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">
+                <Sparkles size={14} className="inline mr-1.5 text-amber-400" />
+                Sound Effects
+              </label>
+              <div className="space-y-1.5">
+                {brand.audioBrandKit.sfx.map((sfxName: string) => (
+                  <div key={sfxName} className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedSfx((prev: string[]) =>
+                          prev.includes(sfxName) ? prev.filter((s: string) => s !== sfxName) : [...prev, sfxName]
+                        );
+                      }}
+                      className={cn(
+                        "flex-1 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-left transition-all",
+                        selectedSfx.includes(sfxName)
+                          ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
+                          : "border-border text-text-muted hover:border-border-hover"
+                      )}
+                    >
+                      <div className={cn(
+                        "h-3.5 w-3.5 rounded border flex items-center justify-center",
+                        selectedSfx.includes(sfxName)
+                          ? "border-amber-500 bg-amber-500"
+                          : "border-border"
+                      )}>
+                        {selectedSfx.includes(sfxName) && (
+                          <CheckCircle2 size={10} className="text-bg" />
+                        )}
+                      </div>
+                      {sfxName}
+                    </button>
+                    <button
+                      onClick={() => handlePreviewSfx(sfxName)}
+                      disabled={sfxPreviewLoading === sfxName}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-text-muted hover:text-text hover:border-border-hover transition-colors disabled:opacity-50"
+                    >
+                      {sfxPreviewLoading === sfxName ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Volume2 size={12} />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </motion.div>
       )}
 

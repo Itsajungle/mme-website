@@ -133,7 +133,7 @@ export async function POST(request: Request) {
     if (outputFormat === "wav" || outputFormat === "both") {
       const wavFile = `mix-${mixId}.wav`;
       const wavPath = join(outDir, wavFile);
-      await execFileAsync(ffmpegPath, buildArgs(wavPath, ["-ar", "48000", "-sample_fmt", "s24"]), {
+      await execFileAsync(ffmpegPath, buildArgs(wavPath, ["-ar", "48000", "-c:a", "pcm_s24le"]), {
         timeout: 60000,
       });
       results.wavUrl = `/api/audio/serve?file=${wavFile}`;

@@ -103,6 +103,33 @@ export function ProductionTimeline({
     }
   }, [externalSegments]);
 
+  // Create/cleanup Audio elements when segments change
+  useEffect(() => {
+    const newMap = new Map<string, HTMLAudioElement>();
+    segments.forEach(seg => {
+      if (seg.audioUrl) {
+        const existing = audioElementsRef.current.get(seg.id);
+        if (existing && existing.src === seg.audioUrl) {
+          newMap.set(seg.id, existing);
+        } else {
+          const audio = new Audio(seg.audioUrl);
+          audio.preload = "auto";
+          newMap.set(seg.id, audio);
+        }
+      }
+    });
+    audioElementsRef.current.forEach((audio, id) => {
+      if (!newMap.has(id)) {
+        audio.pause();
+        audio.src = "";
+      }
+    });
+    audioElementsRef.current = newMap;
+    return () => {
+      newMap.forEach(audio => { audio.pause(); audio.src = ""; });
+    };
+  }, [segments]);
+
   // Drag state
   const [dragging, setDragging] = useState<{
     segId: string;
@@ -115,6 +142,7 @@ export function ProductionTimeline({
   const timelineRef = useRef<HTMLDivElement>(null);
   const playbackRef = useRef<number | null>(null);
   const playStartRef = useRef(0);
+  const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // Ruler ticks
   const tickInterval = totalSeconds <= 15 ? 1 : totalSeconds <= 30 ? 2 : 5;
@@ -142,24 +170,75 @@ export function ProductionTimeline({
         if (looping) {
           playStartRef.current = performance.now();
           setPlayheadPos(0);
+          // Reset all audio elements for loop
+          audioElementsRef.current.forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+          });
         } else {
           setPlaying(false);
           setPlayheadPos(0);
+          // Stop all audio
+          audioElementsRef.current.forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+          });
           return;
         }
       } else {
         setPlayheadPos(elapsed);
+
+        // Sync audio elements with playhead
+        audioElementsRef.current.forEach((audio, segId) => {
+          const seg = segments.find(s => s.id === segId);
+          if (!seg) return;
+          const track = tracks.find(t => t.key === seg.track);
+          const isMuted = track?.muted || false;
+          const hasSolo = tracks.some(t => t.solo);
+          const shouldPlay = !isMuted && (!hasSolo || (track?.solo ?? false));
+
+          if (elapsed >= seg.start && elapsed < seg.end && shouldPlay) {
+            // Calculate volume: base volume, with ducking if applicable
+            let vol = seg.volume / 100;
+            if (seg.ducking?.underVoice) {
+              // Check if any voice segment is active right now
+              const voiceActive = segments.some(
+                vs => vs.track === "voice" && elapsed >= vs.start && elapsed < vs.end
+              );
+              if (voiceActive) {
+                vol = vol * (seg.ducking.duckLevel / 100);
+              }
+            }
+            // Apply track default volume scaling
+            const trackVol = (track?.defaultVolume ?? 100) / 100;
+            audio.volume = Math.min(1, vol * trackVol);
+
+            if (audio.paused) {
+              audio.currentTime = elapsed - seg.start;
+              audio.play().catch(() => {});
+            }
+          } else {
+            if (!audio.paused) {
+              audio.pause();
+            }
+          }
+        });
       }
       playbackRef.current = requestAnimationFrame(tick);
     }
+
     playbackRef.current = requestAnimationFrame(tick);
-  }, [playheadPos, totalSeconds, looping]);
+  }, [playheadPos, totalSeconds, looping, segments, tracks]);
 
   const stopPlayback = useCallback(() => {
     setPlaying(false);
     if (playbackRef.current) {
       cancelAnimationFrame(playbackRef.current);
     }
+    // Stop all audio elements
+    audioElementsRef.current.forEach(audio => {
+      audio.pause();
+    });
   }, []);
 
   const togglePlayback = useCallback(() => {
@@ -270,7 +349,7 @@ export function ProductionTimeline({
           segments: mixSegments,
           totalDuration: totalSeconds,
           loudnessTarget: -23,
-          outputFormat: "both",
+          outputFormat: "mp3",
         });
       }
     } catch {

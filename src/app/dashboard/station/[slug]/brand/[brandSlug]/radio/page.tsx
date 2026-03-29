@@ -11,7 +11,7 @@ import CampaignHistory from "@/components/brand/CampaignHistory";
 import { RadioAdGenerator } from "@/components/radio/RadioAdGenerator";
 import { AudioBrandKitEditor } from "@/components/radio/AudioBrandKitEditor";
 import { AdLibrary } from "@/components/radio/AdLibrary";
-import { ProductionTimeline } from "@/components/radio/ProductionTimeline";
+import { ProductionTimeline, type TimelineSegment } from "@/components/radio/ProductionTimeline";
 import { VoiceBank } from "@/components/radio/VoiceBank";
 import { MusicBank } from "@/components/radio/MusicBank";
 import { SFXBank } from "@/components/radio/SFXBank";
@@ -33,6 +33,8 @@ export default function RadioTabPage({
   const [activeRadioTab, setActiveRadioTab] = useState<RadioTab>("generate");
   const [mode, setMode] = useState<"automated" | "hybrid">("hybrid");
   const [selectedVoice, setSelectedVoice] = useState<VoiceProfile | null>(null);
+  const [generatedSegments, setGeneratedSegments] = useState<TimelineSegment[] | undefined>(undefined);
+  const [generatedDuration, setGeneratedDuration] = useState("30s");
 
   if (!client) return null;
 
@@ -134,13 +136,14 @@ export default function RadioTabPage({
 
               {/* Radio Ad Generator */}
               <div className="rounded-xl border border-border bg-bg-card p-6">
-                <RadioAdGenerator brand={brand} mode={mode} />
+                <RadioAdGenerator brand={brand} mode={mode} onAudioGenerated={(segs, dur) => { setGeneratedSegments(segs); setGeneratedDuration(dur); }} />
               </div>
 
               {/* Production Timeline */}
               <div className="rounded-xl border border-border bg-bg-card p-6">
                 <ProductionTimeline
-                  duration="30s"
+                  duration={generatedDuration}
+                  segments={generatedSegments}
                   readOnly={mode === "automated"}
                 />
               </div>
