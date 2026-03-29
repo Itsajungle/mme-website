@@ -1,86 +1,87 @@
 // Image generator — AI image generation with primary and fallback providers
-// Primary: Flux 2 via fal.ai. Fallback: DALL-E 3 via OpenAI.
+// Primary: Gemini Image Generation. Fallback: DALL-E 3 via OpenAI.
 
 import fs from "fs";
 import path from "path";
 import type { ImageGenerationRequest, GeneratedImage } from "./types";
 
-// ─── Platform aspect ratios ───────────────────────────────────────────────────
-
-type FalImageSize = "landscape_16_9" | "square" | "portrait_4_3";
+// ─── Platform aspect ratios ─────────────────────────────────────────────────
+type GeminiImageSize = "landscape_16_9" | "square" | "portrait_4_3";
 type DallESize = "1024x1024" | "1024x1792" | "1792x1024";
 
 interface PlatformSizeConfig {
-  fal: FalImageSize;
+  gemini: GeminiImageSize;
   dalle: DallESize;
 }
 
 const PLATFORM_SIZES: Record<string, PlatformSizeConfig> = {
-  // Instagram feed — square or portrait
-  "instagram-feed": { fal: "square", dalle: "1024x1024" },
-  // Instagram Stories / Reels — portrait 9:16
-  "instagram-stories": { fal: "portrait_4_3", dalle: "1024x1792" },
-  "instagram-reels": { fal: "portrait_4_3", dalle: "1024x1792" },
-  instagram: { fal: "square", dalle: "1024x1024" },
-  // LinkedIn — landscape or square
-  linkedin: { fal: "landscape_16_9", dalle: "1792x1024" },
-  // X/Twitter — landscape or square
-  x: { fal: "landscape_16_9", dalle: "1792x1024" },
-  twitter: { fal: "landscape_16_9", dalle: "1792x1024" },
-  // Facebook — landscape or square
-  facebook: { fal: "landscape_16_9", dalle: "1792x1024" },
-  // TikTok — portrait
-  tiktok: { fal: "portrait_4_3", dalle: "1024x1792" },
+  "instagram-feed": { gemini: "square", dalle: "1024x1024" },
+  "instagram-stories": { gemini: "portrait_4_3", dalle: "1024x1792" },
+  "instagram-reels": { gemini: "portrait_4_3", dalle: "1024x1792" },
+  instagram: { gemini: "square", dalle: "1024x1024" },
+  linkedin: { gemini: "landscape_16_9", dalle: "1792x1024" },
+  x: { gemini: "landscape_16_9", dalle: "1792x1024" },
+  twitter: { gemini: "landscape_16_9", dalle: "1792x1024" },
+  facebook: { gemini: "landscape_16_9", dalle: "1792x1024" },
+  tiktok: { gemini: "portrait_4_3", dalle: "1024x1792" },
 };
 
 function getSizeConfig(platform: string): PlatformSizeConfig {
   const key = platform.toLowerCase();
-  return PLATFORM_SIZES[key] ?? { fal: "landscape_16_9", dalle: "1792x1024" };
+  return PLATFORM_SIZES[key] ?? { gemini: "landscape_16_9", dalle: "1792x1024" };
 }
 
 // ─── Prompt enhancement ───────────────────────────────────────────────────────
-
 function enhancePrompt(prompt: string, brandSector?: string, brandTone?: string): string {
   const sector = brandSector ?? "business";
   const tone = brandTone ?? "professional";
   return `${prompt}. Professional quality, clean composition, suitable for ${sector} business, ${tone} aesthetic. No text overlays unless specified.`;
 }
 
-// ─── Primary: Flux 2 via fal.ai ───────────────────────────────────────────────
+// ─── Image download and save ─────────────────────────────────────────────
+const GENERATED_DIR = "/tmp/mme-images";
 
-const FAL_ENDPOINT = "https://fal.run/fal-ai/flux-pro/v1.1-ultra";
-
-interface FalRequest {
-  prompt: string;
-  image_size: FalImageSize;
-  num_images: 1;
-  safety_tolerance: "2";
+function ensureGeneratedDir(): void {
+  if (!fs.existsSync(GENERATED_DIR)) {
+    fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  }
 }
 
-interface FalResponse {
-  images: { url: string; content_type: string }[];
+// ─── Primary: Gemini Image Generation ────────────────────────────────────────
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
+
+interface GeminiImageResponse {
+  candidates?: {
+    content?: {
+      parts?: { inlineData?: { mimeType: string; data: string }; text?: string }[];
+    };
+  }[];
 }
 
-async function generateWithFal(
+async function generateWithGemini(
   prompt: string,
   sizeConfig: PlatformSizeConfig
 ): Promise<string> {
-  const apiKey = process.env.FAL_API_KEY;
-  if (!apiKey) throw new Error("FAL_API_KEY not configured");
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
 
-  const body: FalRequest = {
-    prompt,
-    image_size: sizeConfig.fal,
-    num_images: 1,
-    safety_tolerance: "2",
+  const aspectHint = sizeConfig.gemini === "square"
+    ? "Square format (1:1 aspect ratio)."
+    : sizeConfig.gemini === "portrait_4_3"
+    ? "Portrait format (3:4 aspect ratio)."
+    : "Landscape format (16:9 aspect ratio).";
+
+  const body = {
+    contents: [{ parts: [{ text: `${prompt} ${aspectHint}` }] }],
+    generationConfig: {
+      responseModalities: ["TEXT", "IMAGE"],
+      responseMimeType: "text/plain",
+    },
   };
 
-  const res = await fetch(FAL_ENDPOINT, {
+  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
     method: "POST",
-    headers: {
-      Authorization: `Key ${apiKey}`,
-      "content-type": "application/json",
-    },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
 
@@ -89,23 +90,27 @@ async function generateWithFal(
     throw new Error(`Image generation API error ${res.status}: ${text}`);
   }
 
-  const data: FalResponse = await res.json();
-  const imageUrl = data?.images?.[0]?.url;
-  if (!imageUrl) throw new Error("No image URL in response");
-  return imageUrl;
+  const data: GeminiImageResponse = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts;
+  const imagePart = parts?.find((p) => p.inlineData?.data);
+
+  if (!imagePart?.inlineData) throw new Error("No image data in response");
+
+  const { mimeType, data: b64Data } = imagePart.inlineData;
+  const buffer = Buffer.from(b64Data, "base64");
+
+  ensureGeneratedDir();
+  const timestamp = Date.now();
+  const ext = mimeType.includes("png") ? "png" : "jpg";
+  const filename = `gen-${timestamp}.${ext}`;
+  const localPath = path.join(GENERATED_DIR, filename);
+  fs.writeFileSync(localPath, buffer);
+
+  return `/api/images/serve?file=${filename}`;
 }
 
-// ─── Fallback: DALL-E 3 via OpenAI ───────────────────────────────────────────
-
+// ─── Fallback: DALL-E 3 via OpenAI ───────────────────────────────────────
 const DALLE_ENDPOINT = "https://api.openai.com/v1/images/generations";
-
-interface DallERequest {
-  model: "dall-e-3";
-  prompt: string;
-  size: DallESize;
-  quality: "hd";
-  n: 1;
-}
 
 interface DallEResponse {
   data: { url: string }[];
@@ -118,7 +123,7 @@ async function generateWithDallE(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
-  const body: DallERequest = {
+  const body = {
     model: "dall-e-3",
     prompt,
     size: sizeConfig.dalle,
@@ -143,39 +148,26 @@ async function generateWithDallE(
   const data: DallEResponse = await res.json();
   const imageUrl = data?.data?.[0]?.url;
   if (!imageUrl) throw new Error("No image URL in fallback response");
+
   return imageUrl;
-}
-
-// ─── Image download and save ──────────────────────────────────────────────────
-
-const GENERATED_DIR = "/tmp/mme-images";
-
-function ensureGeneratedDir(): void {
-  if (!fs.existsSync(GENERATED_DIR)) {
-    fs.mkdirSync(GENERATED_DIR, { recursive: true });
-  }
 }
 
 async function downloadAndSave(imageUrl: string, brandSlug: string, platform: string): Promise<string> {
   ensureGeneratedDir();
-
   const timestamp = Date.now();
   const filename = `${brandSlug}-${platform}-${timestamp}.jpg`;
   const localPath = path.join(GENERATED_DIR, filename);
+
   const res = await fetch(imageUrl);
   if (!res.ok) throw new Error(`Failed to download generated image: ${res.status}`);
-
   const buffer = Buffer.from(await res.arrayBuffer());
   fs.writeFileSync(localPath, buffer);
 
-  // Return API serve URL instead of static path (Docker can't serve runtime files from public/)
   return `/api/images/serve?file=${filename}`;
 }
 
-// ─── Placeholder path ─────────────────────────────────────────────────────────
-
+// ─── Placeholder path ───────────────────────────────────────────────────
 function getPlaceholderPath(platform: string): string {
-  // Return inline SVG placeholder — avoids dependency on files that may not exist in Docker
   const colors: Record<string, string> = {
     instagram: "%23e1306c",
     facebook: "%231877f2",
@@ -188,37 +180,31 @@ function getPlaceholderPath(platform: string): string {
   return `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800' viewBox='0 0 800 800'><rect fill='${color}' width='800' height='800' opacity='0.15'/><text x='400' y='400' text-anchor='middle' dominant-baseline='middle' fill='${color}' font-size='32' font-family='sans-serif'>MME · ${platform}</text></svg>`;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
+// ─── Public API ────────────────────────────────────────────────────────
 export async function generateImage(
   params: ImageGenerationRequest & { brandSector?: string; brandTone?: string }
 ): Promise<GeneratedImage> {
   const enhancedPrompt = enhancePrompt(params.prompt, params.brandSector, params.brandTone);
   const sizeConfig = getSizeConfig(params.platform);
 
-  // Determine available providers
-  const hasFal = !!process.env.FAL_API_KEY;
+  const hasGemini = !!process.env.GEMINI_API_KEY;
   const hasDallE = !!process.env.OPENAI_API_KEY;
 
-  if (!hasFal && !hasDallE) {
-    // No image API configured — return placeholder
+  if (!hasGemini && !hasDallE) {
     return {
       url: getPlaceholderPath(params.platform),
       localPath: getPlaceholderPath(params.platform),
       prompt: enhancedPrompt,
-      // provider label kept abstract — no service name in user-visible output
       provider: "placeholder",
     };
   }
 
-  // Try primary provider first, then fallback
-  if (hasFal) {
+  if (hasGemini) {
     try {
-      const remoteUrl = await generateWithFal(enhancedPrompt, sizeConfig);
-      const localPath = await downloadAndSave(remoteUrl, params.brandSlug, params.platform);
+      const localUrl = await generateWithGemini(enhancedPrompt, sizeConfig);
       return {
-        url: localPath,
-        localPath,
+        url: localUrl,
+        localPath: localUrl,
         prompt: enhancedPrompt,
         provider: "primary",
       };
