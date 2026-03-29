@@ -431,7 +431,56 @@ export function generateScript(input: ScriptInput): GeneratedScript {
   const template = templates[Math.floor(Math.random() * templates.length)];
   const segments = template(input);
 
-  // Build full text and directions
+  // Count words in voice segments only
+  const voiceWords = (seg: ScriptSegment) =>
+    seg.text.split(/\s+/).filter(Boolean);
+  let wordCount = segments
+    .filter((s) => s.type === "voice")
+    .flatMap(voiceWords).length;
+
+  // Enforce word count targets — trim if more than 10% over
+  const target = WORD_TARGETS[input.duration];
+  let trimmed = false;
+  if (target && wordCount > target * 1.1) {
+    // Find the longest voice segment (but preserve the logo line at the end)
+    const voiceSegments = segments.filter((s) => s.type === "voice");
+    const longest = voiceSegments.reduce((a, b) =>
+      a.text.length > b.text.length ? a : b
+    );
+
+    // Split into sentences, keeping the logo line (last sentence) intact
+    const sentences = longest.text.split(/(?<=\.)\s+/);
+    const logoLine = sentences[sentences.length - 1];
+    let trimSentences = sentences.slice(0, -1);
+
+    // Remove sentences from the end until we're within target
+    while (trimSentences.length > 0) {
+      const candidateText = [...trimSentences, logoLine].join(" ");
+      const otherVoiceWords = segments
+        .filter((s) => s.type === "voice" && s !== longest)
+        .flatMap(voiceWords).length;
+      const candidateWords = candidateText.split(/\s+/).filter(Boolean).length;
+      if (otherVoiceWords + candidateWords <= target) break;
+      trimSentences.pop();
+    }
+
+    const newText = [...trimSentences, logoLine].join(" ");
+    if (newText !== longest.text) {
+      longest.text = newText;
+      trimmed = true;
+      // Recalculate word count
+      wordCount = segments
+        .filter((s) => s.type === "voice")
+        .flatMap(voiceWords).length;
+    }
+  }
+
+  const nonVoiceDuration = segments
+    .filter((s) => s.type !== "voice")
+    .reduce((sum, s) => sum + s.duration, 0);
+  const estimatedDuration = wordCount / 2.5 + nonVoiceDuration;
+
+  // Rebuild fullText and directions after potential trimming
   let fullText = "";
   let directions = "";
 
@@ -448,13 +497,10 @@ export function generateScript(input: ScriptInput): GeneratedScript {
     }
   }
 
-  // Count words in voice segments only
-  const voiceText = segments
-    .filter((s) => s.type === "voice")
-    .map((s) => s.text)
-    .join(" ");
-  const wordCount = voiceText.split(/\s+/).filter(Boolean).length;
-  const estimatedDuration = wordCount / 2.5 + segments.filter((s) => s.type !== "voice").reduce((sum, s) => sum + s.duration, 0);
+  if (trimmed) {
+    const trimNote = `[Script trimmed to fit ${input.duration}s — ${wordCount} words at 2.5 wps]`;
+    directions += "\n" + trimNote;
+  }
 
   return {
     fullText: fullText.trim(),
