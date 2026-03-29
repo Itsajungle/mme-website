@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Mic2,
@@ -157,10 +157,16 @@ export function ProductionTimeline({
     };
   }, [dragging, totalSeconds, zoom, onSegmentsChange]);
 
-  // Create/cleanup Audio elements when segments change
+  // Stable key that only changes when segment audio URLs change (not positions)
+  const audioUrlKey = useMemo(
+    () => segments.map(s => s.id + '|' + (s.audioUrl || '')).join(','),
+    [segments]
+  );
+
+  // Create/cleanup Audio elements only when audio URLs change
   useEffect(() => {
     const newMap = new Map<string, HTMLAudioElement>();
-    segments.forEach(seg => {
+    segmentsRef.current.forEach(seg => {
       if (seg.audioUrl) {
         const existing = audioElementsRef.current.get(seg.id);
         if (existing && existing.src === seg.audioUrl) {
@@ -179,10 +185,16 @@ export function ProductionTimeline({
       }
     });
     audioElementsRef.current = newMap;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioUrlKey]);
+
+  // Cleanup audio on unmount only
+  useEffect(() => {
     return () => {
-      newMap.forEach(audio => { audio.pause(); audio.src = ""; });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      audioElementsRef.current.forEach(audio => { audio.pause(); audio.src = ""; });
     };
-  }, [segments]);
+  }, []);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const playbackRef = useRef<number | null>(null);
@@ -319,48 +331,9 @@ export function ProductionTimeline({
         origEnd: seg.end,
       });
       setSelectedSegmentId(segId);
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
     },
     [segments, readOnly]
   );
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragging || !timelineRef.current) return;
-      const rect = timelineRef.current.getBoundingClientRect();
-      const pixelsPerSecond = (rect.width * zoom) / totalSeconds;
-      const dx = e.clientX - dragging.startX;
-      const dt = dx / pixelsPerSecond;
-
-      setSegments((prev) =>
-        prev.map((seg) => {
-          if (seg.id !== dragging.segId) return seg;
-          if (dragging.type === "move") {
-            const duration = dragging.origEnd - dragging.origStart;
-            let newStart = snapToGrid(dragging.origStart + dt);
-            newStart = Math.max(0, Math.min(totalSeconds - duration, newStart));
-            return { ...seg, start: newStart, end: newStart + duration };
-          } else if (dragging.type === "resize-left") {
-            let newStart = snapToGrid(dragging.origStart + dt);
-            newStart = Math.max(0, Math.min(dragging.origEnd - MIN_SEGMENT_LENGTH, newStart));
-            return { ...seg, start: newStart };
-          } else {
-            let newEnd = snapToGrid(dragging.origEnd + dt);
-            newEnd = Math.max(dragging.origStart + MIN_SEGMENT_LENGTH, Math.min(totalSeconds, newEnd));
-            return { ...seg, end: newEnd };
-          }
-        })
-      );
-    },
-    [dragging, totalSeconds, zoom]
-  );
-
-  const handlePointerUp = useCallback(() => {
-    if (dragging) {
-      setDragging(null);
-      onSegmentsChange?.(segmentsRef.current);
-    }
-  }, [dragging, onSegmentsChange]);
 
   // Ruler click to set playhead
   const handleRulerClick = useCallback(
