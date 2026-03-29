@@ -212,12 +212,20 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
   ]);
   const [blogContent, setBlogContent] = useState("");
 
-  // Slideshow input fields
+  // Slideshow input fields (car dealer)
   const [slideshowProduct, setSlideshowProduct] = useState("");
   const [slideshowFeatures, setSlideshowFeatures] = useState("");
   const [slideshowDealer, setSlideshowDealer] = useState("");
   const [slideshowLocation, setSlideshowLocation] = useState("");
   const [slideshowCount, setSlideshowCount] = useState(7);
+  const [carMake, setCarMake] = useState("");
+  const [carModel, setCarModel] = useState("");
+  const [carColour, setCarColour] = useState("");
+  const [dealDetails, setDealDetails] = useState("");
+  const [slideshowVoiceId, setSlideshowVoiceId] = useState("");
+  const [availableVoices, setAvailableVoices] = useState<Array<{ voiceId: string; name: string; accent?: string }>>([]);
+  const [slideshowProgress, setSlideshowProgress] = useState<string | null>(null);
+  const [slideshowAudioUrl, setSlideshowAudioUrl] = useState<string | null>(null);
 
   // Generated content results (Quick Post / MME Moment)
   const [generatedContent, setGeneratedContent] = useState<GeneratedContentItem[] | null>(null);
@@ -277,6 +285,24 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
       }
     }
   }, [checkCanvaStatus]);
+
+  // Load available voices for slideshow
+  useEffect(() => {
+    fetch("/api/audio/voices")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.voices) {
+          setAvailableVoices(
+            data.voices.map((v: { voice_id?: string; voiceId?: string; name: string; accent?: string }) => ({
+              voiceId: v.voice_id ?? v.voiceId ?? "",
+              name: v.name,
+              accent: v.accent,
+            })),
+          );
+        }
+      })
+      .catch(() => { /* voices will use brand default */ });
+  }, []);
 
   // ── Helpers ──────────────────────────────────────────────────────────
   const togglePlatform = (id: string) => {
@@ -411,42 +437,65 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
     }
   };
 
-  // Generate slideshow
+  // Generate narrated slideshow (car dealer)
   const handleGenerateSlideshow = async () => {
-    if (!slideshowProduct.trim()) {
-      showError("Enter a product or service name.");
+    if (!carMake.trim() || !carModel.trim()) {
+      showError("Enter at least the car make and model.");
       return;
     }
     setIsGeneratingSlideshow(true);
     clearError();
     setGeneratedSlides(null);
+    setSlideshowAudioUrl(null);
+    setGeneratedVideoUrl(null);
+    setGeneratedAudioUrl(null);
+    setSlideshowProgress("Generating script...");
     try {
-      const res = await fetch("/api/social/generate-content", {
+      const res = await fetch("/api/social/generate-slideshow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brandSlug: brand.slug,
-          contentType: "slideshow",
-          productName: slideshowProduct,
-          productFeatures: slideshowFeatures || undefined,
-          dealerName: slideshowDealer || undefined,
-          dealerLocation: slideshowLocation || undefined,
-          slideCount: slideshowCount,
+          carMake,
+          carModel,
+          carColour: carColour || "white",
+          dealDetails: dealDetails || "Great deals available",
+          voiceId: slideshowVoiceId || undefined,
         }),
       });
-      if (!res.ok) throw new Error("Slideshow generation failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Slideshow generation failed");
+      }
+      setSlideshowProgress("Processing results...");
       const data = await res.json();
 
       if (data.success && data.slides) {
-        setGeneratedSlides(data.slides as GeneratedSlide[]);
+        setGeneratedSlides(
+          data.slides.map((s: { type: string; heading: string; narration: string; imageUrl?: string; duration: number }, i: number) => ({
+            slideNumber: i + 1,
+            heading: s.heading,
+            narration: s.narration,
+            imagePrompt: "",
+            imageUrl: s.imageUrl,
+            duration: s.duration,
+            type: s.type,
+          })),
+        );
         setSlideshowTotalDuration(data.totalDuration ?? 0);
-        setSlideshowScript(data.scriptSummary ?? "");
+        setSlideshowScript(
+          data.script
+            ? `${data.script.intro} ${data.script.carDescription} ${data.script.cta}`
+            : "",
+        );
+        setSlideshowAudioUrl(data.audioUrl ?? null);
       }
       setPipelineStatus("review");
-    } catch {
-      showError("Something went wrong generating your slideshow. Please try again.");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Something went wrong generating your slideshow.");
     } finally {
       setIsGeneratingSlideshow(false);
+      setSlideshowProgress(null);
     }
   };
 
@@ -490,7 +539,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
     );
   };
 
-  // Generate slideshow video (single long take)
+  // Generate slideshow video (single composed output)
   const handleGenerateSlideshowVideo = async () => {
     if (!generatedSlides || generatedSlides.length === 0) {
       showError("Generate a slideshow first.");
@@ -499,7 +548,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
     setIsGeneratingVideo(true);
     clearError();
     try {
-      const fullScript = generatedSlides.map((s) => s.narration).join("\n\n");
+      const fullScript = generatedSlides.map((s) => s.narration).filter(Boolean).join("\n\n");
       const res = await fetch("/api/social/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -507,6 +556,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
           script: fullScript,
           brandSlug: brand.slug,
           format: "16:9" as const,
+          audioUrl: slideshowAudioUrl,
           slides: generatedSlides.map((s) => ({
             heading: s.heading,
             narration: s.narration,
@@ -518,7 +568,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
       if (!res.ok) throw new Error("Video generation failed");
       const data = await res.json();
       setGeneratedVideoUrl(data.videoUrl ?? data.url ?? null);
-      setGeneratedAudioUrl(data.audioUrl ?? null);
+      setGeneratedAudioUrl(data.audioUrl ?? slideshowAudioUrl ?? null);
       setPipelineStatus("review");
     } catch {
       showError("Something went wrong generating the video. Please try again.");
@@ -1003,75 +1053,91 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
               {/* ── Slideshow ── */}
               {mode === "slideshow" && (
                 <div className="space-y-4">
-                  {/* Slideshow input form */}
+                  {/* Car dealer slideshow input form */}
                   {!generatedSlides && (
                     <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
-                          Product / Service Name
-                        </label>
-                        <input
-                          value={slideshowProduct}
-                          onChange={(e) => setSlideshowProduct(e.target.value)}
-                          placeholder="e.g. 2024 Toyota Corolla"
-                          className="w-full bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                        />
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
+                            Car Make
+                          </label>
+                          <input
+                            value={carMake}
+                            onChange={(e) => setCarMake(e.target.value)}
+                            placeholder="e.g. Toyota"
+                            className="w-full bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
+                            Car Model
+                          </label>
+                          <input
+                            value={carModel}
+                            onChange={(e) => setCarModel(e.target.value)}
+                            placeholder="e.g. Corolla"
+                            className="w-full bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
+                            Colour
+                          </label>
+                          <input
+                            value={carColour}
+                            onChange={(e) => setCarColour(e.target.value)}
+                            placeholder="e.g. Pearl White"
+                            className="w-full bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
-                          Key Features
+                          Deal / Promotion Details
                         </label>
                         <textarea
-                          value={slideshowFeatures}
-                          onChange={(e) => setSlideshowFeatures(e.target.value)}
-                          placeholder="Fuel efficient, spacious interior, advanced safety…"
+                          value={dealDetails}
+                          onChange={(e) => setDealDetails(e.target.value)}
+                          placeholder="0% finance, free first service, 3-year warranty, trade-in bonus…"
                           className="w-full h-20 bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted resize-none focus:outline-none focus:border-accent/50 transition-colors"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
-                            Dealer / Business
-                          </label>
-                          <input
-                            value={slideshowDealer}
-                            onChange={(e) => setSlideshowDealer(e.target.value)}
-                            placeholder="Dealer name"
-                            className="w-full bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
-                            Location
-                          </label>
-                          <input
-                            value={slideshowLocation}
-                            onChange={(e) => setSlideshowLocation(e.target.value)}
-                            placeholder="City / Town"
-                            className="w-full bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                          />
-                        </div>
-                      </div>
                       <div>
                         <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-1.5 block">
-                          Number of Slides
+                          AI Voice
                         </label>
-                        <div className="relative w-32">
+                        <div className="relative">
                           <select
-                            value={slideshowCount}
-                            onChange={(e) => setSlideshowCount(Number(e.target.value))}
+                            value={slideshowVoiceId}
+                            onChange={(e) => setSlideshowVoiceId(e.target.value)}
                             className="w-full appearance-none bg-bg-deep border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/50 transition-colors pr-8"
                           >
-                            <option value={5}>5 slides</option>
-                            <option value={7}>7 slides</option>
-                            <option value={10}>10 slides</option>
+                            <option value="">Default (Brand Voice)</option>
+                            {availableVoices.map((v) => (
+                              <option key={v.voiceId} value={v.voiceId}>
+                                {v.name}{v.accent ? ` — ${v.accent}` : ""}
+                              </option>
+                            ))}
                           </select>
                           <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                         </div>
                       </div>
+
+                      {/* Progress indicator */}
+                      {slideshowProgress && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/5 border border-accent/20"
+                        >
+                          <Loader2 size={12} className="animate-spin text-accent" />
+                          <span className="text-xs text-accent">{slideshowProgress}</span>
+                        </motion.div>
+                      )}
+
                       <button
                         onClick={handleGenerateSlideshow}
-                        disabled={isGeneratingSlideshow || !slideshowProduct.trim()}
+                        disabled={isGeneratingSlideshow || !carMake.trim() || !carModel.trim()}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-bg text-xs font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {isGeneratingSlideshow ? (
@@ -1079,7 +1145,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                         ) : (
                           <Sparkles size={12} />
                         )}
-                        {isGeneratingSlideshow ? "Generating Slideshow…" : "Generate Slideshow"}
+                        {isGeneratingSlideshow ? "Generating Narrated Slideshow…" : "Generate Narrated Slideshow"}
                       </button>
                     </div>
                   )}
@@ -1089,10 +1155,15 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] uppercase tracking-wider text-text-muted font-mono">
-                          Slideshow · {generatedSlides.length} slides
+                          Narrated Slideshow · {generatedSlides.length} slides
                         </p>
                         <button
-                          onClick={() => setGeneratedSlides(null)}
+                          onClick={() => {
+                            setGeneratedSlides(null);
+                            setSlideshowAudioUrl(null);
+                            setGeneratedVideoUrl(null);
+                            setGeneratedAudioUrl(null);
+                          }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] text-text-muted hover:text-text hover:bg-white/5 transition-colors"
                         >
                           <RefreshCw size={10} />
@@ -1106,7 +1177,15 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                         <div className="absolute left-[17px] top-4 bottom-4 w-px bg-border" />
 
                         {generatedSlides.map((slide, i) => {
-                          const wordCount = slide.narration.split(/\s+/).length;
+                          const wordCount = slide.narration ? slide.narration.split(/\s+/).filter(Boolean).length : 0;
+                          const slideType = (slide as GeneratedSlide & { type?: string }).type;
+                          const typeLabel =
+                            slideType === "logo" ? "Logo"
+                            : slideType === "avatar_intro" ? "Intro"
+                            : slideType === "car_image" ? "Car"
+                            : slideType === "callout" ? "Deal"
+                            : slideType === "avatar_cta" ? "CTA"
+                            : "";
                           return (
                             <motion.div
                               key={slide.slideNumber}
@@ -1123,7 +1202,14 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                               </div>
 
                               <div className="rounded-xl border border-border bg-bg-card p-4 space-y-3">
-                                <p className="text-sm font-semibold text-text">{slide.heading}</p>
+                                <div className="flex items-center gap-2">
+                                  {typeLabel && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-accent/10 text-accent border border-accent/20 uppercase tracking-wider">
+                                      {typeLabel}
+                                    </span>
+                                  )}
+                                  <p className="text-sm font-semibold text-text">{slide.heading}</p>
+                                </div>
 
                                 {/* Image */}
                                 <div className="aspect-video rounded-lg overflow-hidden border border-border bg-bg-deep">
@@ -1140,13 +1226,19 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                                   )}
                                 </div>
 
-                                <p className="text-xs text-text-secondary leading-relaxed">
-                                  {slide.narration}
-                                </p>
+                                {slide.narration && (
+                                  <p className="text-xs text-text-secondary leading-relaxed">
+                                    {slide.narration}
+                                  </p>
+                                )}
 
                                 <div className="flex items-center gap-3 text-[10px] font-mono text-text-muted">
-                                  <span>{wordCount} words</span>
-                                  <span>·</span>
+                                  {wordCount > 0 && (
+                                    <>
+                                      <span>{wordCount} words</span>
+                                      <span>·</span>
+                                    </>
+                                  )}
                                   <span>{slide.duration}s</span>
                                   <Play size={10} className="ml-auto text-text-muted opacity-50" />
                                 </div>
@@ -1166,6 +1258,16 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                         </span>
                       </div>
 
+                      {/* Audio narration player */}
+                      {slideshowAudioUrl && !generatedVideoUrl && (
+                        <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 space-y-2">
+                          <p className="text-[10px] uppercase tracking-wider text-accent font-mono">
+                            AI Narration
+                          </p>
+                          <audio src={slideshowAudioUrl} controls className="w-full" />
+                        </div>
+                      )}
+
                       {/* Generate Video button */}
                       <button
                         onClick={handleGenerateSlideshowVideo}
@@ -1177,7 +1279,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                         ) : (
                           <Video size={14} />
                         )}
-                        {isGeneratingVideo ? "Generating Video…" : "Generate Video"}
+                        {isGeneratingVideo ? "Composing Video…" : "Compose Video"}
                       </button>
 
                       {/* Video / audio result */}
@@ -1191,11 +1293,19 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                           >
                             {generatedVideoUrl && (
                               <div className="aspect-video rounded-lg overflow-hidden border border-accent/20 bg-bg-deep">
-                                <video
-                                  src={generatedVideoUrl}
-                                  controls
-                                  className="w-full h-full object-cover"
-                                />
+                                {generatedVideoUrl.includes("/api/video/serve") ? (
+                                  <video
+                                    src={generatedVideoUrl}
+                                    controls
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <img
+                                    src={generatedVideoUrl}
+                                    alt="Slideshow preview"
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
                               </div>
                             )}
                             {generatedAudioUrl && (
@@ -1263,27 +1373,39 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
               <div className="space-y-3 max-h-[540px] overflow-y-auto pr-1">
                 <div className="rounded-lg border border-border bg-bg-deep p-3 text-center">
                   <p className="text-xs text-text-muted font-mono mb-1">Narrated Slideshow</p>
-                  <p className="text-lg font-semibold text-text">{slideshowProduct}</p>
+                  <p className="text-lg font-semibold text-text">
+                    {carMake && carModel ? `${carMake} ${carModel}` : slideshowProduct || "Car Dealer Promo"}
+                  </p>
                   <p className="text-xs text-text-muted mt-1">
                     {generatedSlides.length} slides · {Math.floor(slideshowTotalDuration / 60)}:{String(slideshowTotalDuration % 60).padStart(2, "0")}
                   </p>
                 </div>
-                {generatedSlides.map((slide) => (
-                  <div key={slide.slideNumber} className="rounded-lg border border-border bg-bg-card p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-[10px] font-bold font-mono flex items-center justify-center">
-                        {slide.slideNumber}
-                      </span>
-                      <span className="text-xs font-medium text-text">{slide.heading}</span>
-                    </div>
-                    {slide.imageUrl && (
-                      <div className="aspect-video rounded overflow-hidden mb-2">
-                        <img src={slide.imageUrl} alt={slide.heading} className="w-full h-full object-cover" />
+                {generatedSlides.map((slide) => {
+                  const slideType = (slide as GeneratedSlide & { type?: string }).type;
+                  return (
+                    <div key={slide.slideNumber} className="rounded-lg border border-border bg-bg-card p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="w-6 h-6 rounded-full bg-accent/10 text-accent text-[10px] font-bold font-mono flex items-center justify-center">
+                          {slide.slideNumber}
+                        </span>
+                        <span className="text-xs font-medium text-text">{slide.heading}</span>
+                        {slideType === "callout" && (
+                          <span className="ml-auto px-1.5 py-0.5 rounded text-[8px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">
+                            DEAL
+                          </span>
+                        )}
                       </div>
-                    )}
-                    <p className="text-[11px] text-text-secondary leading-relaxed">{slide.narration}</p>
-                  </div>
-                ))}
+                      {slide.imageUrl && (
+                        <div className="aspect-video rounded overflow-hidden mb-2">
+                          <img src={slide.imageUrl} alt={slide.heading} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {slide.narration && (
+                        <p className="text-[11px] text-text-secondary leading-relaxed">{slide.narration}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex items-center justify-center h-48 rounded-xl border border-dashed border-border text-text-muted text-sm">

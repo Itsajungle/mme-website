@@ -95,6 +95,57 @@ export function buildContentPrompt(params: {
   return lines.join("\n");
 }
 
+export const CAR_DEALER_SLIDESHOW_SYSTEM = `You are creating a narrated slideshow video for a car dealership promotion.
+The output is a SINGLE continuous narrated video — not separate clips.
+
+You will return a structured JSON object with these sections:
+
+{
+  "intro": "Opening greeting and hook — 3–4 sentences, warm Irish English tone. Mention the dealer name and location.",
+  "carDescription": "Describe the featured car enthusiastically — colour, model, key selling points. 2–3 sentences.",
+  "dealPoints": ["0% Finance Available", "3-Year Warranty Included", "Free First Service"],
+  "cta": "Closing call to action — visit the showroom, call, or check the website. 2–3 sentences with urgency.",
+  "slideOrder": [
+    { "type": "logo", "duration": 3 },
+    { "type": "avatar_intro", "duration": 10, "narrationKey": "intro" },
+    { "type": "car_image", "duration": 7, "narrationKey": "carDescription" },
+    { "type": "callout", "duration": 4, "dealPointIndex": 0 },
+    { "type": "callout", "duration": 4, "dealPointIndex": 1 },
+    { "type": "callout", "duration": 4, "dealPointIndex": 2 },
+    { "type": "avatar_cta", "duration": 8, "narrationKey": "cta" },
+    { "type": "logo", "duration": 3 }
+  ]
+}
+
+RULES:
+- Use Irish English tone: "pop in", "brilliant", "just down the road", "we'd love to see you"
+- Word count target: 2.5 words per second of narration
+- intro narration: ~25 words (10s)
+- carDescription narration: ~18 words (7s)
+- cta narration: ~20 words (8s)
+- dealPoints: short punchy text for overlay cards (3-6 words each)
+- Always include at least 2 deal points, max 5
+- Return ONLY the JSON object, no markdown fences`;
+
+export function buildCarDealerSlideshowPrompt(params: {
+  brandName: string;
+  carMake: string;
+  carModel: string;
+  carColour: string;
+  dealDetails: string;
+  dealerName?: string;
+  dealerLocation?: string;
+}): string {
+  const lines: string[] = [];
+  lines.push(`Brand: ${params.brandName}`);
+  lines.push(`Car: ${params.carColour} ${params.carMake} ${params.carModel}`);
+  lines.push(`Dealer: ${params.dealerName ?? params.brandName}`);
+  if (params.dealerLocation) lines.push(`Location: ${params.dealerLocation}`);
+  lines.push(`\nDeal / Promotion Details:\n${params.dealDetails}`);
+  lines.push(`\nCreate the narrated slideshow script for this car dealer promotion.`);
+  return lines.join("\n");
+}
+
 export function buildSlideshowPrompt(params: {
   brandName: string;
   productName?: string;
