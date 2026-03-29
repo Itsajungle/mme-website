@@ -18,12 +18,19 @@ import {
   Mic,
   Wand2,
   BarChart3,
+  Kanban,
+  Calendar,
+  Users,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QuickBriefForm } from "./QuickBriefForm";
 import { ScriptEditor } from "./ScriptEditor";
 import { SalesActivityFeed } from "./SalesActivityFeed";
 import { RepSelector } from "./RepSelector";
+import { SalesPipeline } from "./SalesPipeline";
+import { SalesCalendar } from "./SalesCalendar";
+import { RepProfileCards } from "./RepProfileCards";
 import type {
   DemoAdBrief,
   GenerateResponse,
@@ -32,6 +39,15 @@ import type {
 } from "@/lib/sales-portal/types";
 import { PIPELINE_LABELS } from "@/lib/sales-portal/types";
 import { DEMO_REPS } from "@/lib/sales-portal/demo-reps";
+
+type PortalTab = "pipeline" | "calendar" | "team" | "studio";
+
+const TABS: { id: PortalTab; label: string; icon: typeof Kanban }[] = [
+  { id: "pipeline", label: "Pipeline", icon: Kanban },
+  { id: "calendar", label: "Calendar", icon: Calendar },
+  { id: "team", label: "Team", icon: Users },
+  { id: "studio", label: "Demo Studio", icon: Radio },
+];
 
 interface SalesDemoBoardProps {
   stationId: string;
@@ -85,6 +101,9 @@ const SEEDED_ACTIVITIES: DemoAdActivity[] = [
 ];
 
 export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) {
+  // Tab state
+  const [activeTab, setActiveTab] = useState<PortalTab>("pipeline");
+
   // Rep selector state
   const [selectedRepId, setSelectedRepId] = useState(DEMO_REPS[0].id);
   const selectedRep = DEMO_REPS.find((r) => r.id === selectedRepId)!;
@@ -294,6 +313,41 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
 
   return (
     <div className="space-y-6">
+      {/* Tab Bar */}
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-bg-card p-1">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-all",
+                isActive
+                  ? "bg-accent/10 text-accent shadow-sm"
+                  : "text-text-muted hover:text-text hover:bg-white/5"
+              )}
+            >
+              <Icon size={14} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Pipeline tab */}
+      {activeTab === "pipeline" && <SalesPipeline />}
+
+      {/* Calendar tab */}
+      {activeTab === "calendar" && <SalesCalendar />}
+
+      {/* Team tab */}
+      {activeTab === "team" && <RepProfileCards />}
+
+      {/* Demo Studio tab */}
+      {activeTab === "studio" && (
+      <div className="space-y-6">
       {/* Rep Selector */}
       <RepSelector selectedRepId={selectedRepId} onSelectRep={setSelectedRepId} />
 
@@ -551,6 +605,8 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
           <SalesActivityFeed activities={repActivities} onPlayAudio={handlePlayActivity} />
         </div>
       </div>
+      </div>
+      )}
     </div>
   );
 }
