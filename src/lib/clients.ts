@@ -35,7 +35,7 @@ export const CLIENTS: Client[] = [
         slug: "sunshine-radio",
         name: "Sunshine Radio",
         frequency: "106.8 FM",
-        broadcastArea: "Herefordshire & Worcestershire",
+        broadcastArea: "Dublin & Greater Dublin",
         sectors: ["Motoring", "Hospitality", "Financial", "Retail", "Health & Fitness"],
         status: "pilot-active",
       },

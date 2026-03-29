@@ -172,7 +172,7 @@ export const PIPELINE_ITEMS: PipelineItemData[] = [
   {
     id: "QE-1044",
     contentType: "social-post",
-    brandName: "Wye Valley Tours",
+    brandName: "Wicklow Adventure Tours",
     title: "Weekend Adventure Reel",
     currentStage: "creative-director",
     status: "approved",
@@ -334,7 +334,7 @@ export const TIMELINE_ENTRIES: TimelineEntry[] = [
     agent: "Distribution",
     agentColor: "#10B981",
     action: "Delivered",
-    detail: "Wye Valley Tours reel published to social channels",
+    detail: "Wicklow Adventure Tours reel published to social channels",
     contentId: "QE-1044",
   },
 ];

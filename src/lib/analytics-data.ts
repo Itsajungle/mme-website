@@ -793,7 +793,7 @@ const NAPOLI_RADIO_ADS: RadioAdAnalytics[] = [
   {
     adId: "nap-rad-001", adName: "Rainy Night Comfort Food", campaignId: "camp-4",
     brandSlug: "napoli-kitchen", stationSlug: "sunshine-radio", duration: 30,
-    triggerType: "weather", momentTitle: "Rain forecast for Herefordshire evening",
+    triggerType: "weather", momentTitle: "Rain forecast for Dublin evening",
     popScore: 82, totalPlays: 186, fmPlays: 118, dabPlays: 42, streamingInsertions: 26,
     estimatedReach: 14200, frequency: 2.4,
     daypartBreakdown: { breakfast: 12, daytime: 28, drive: 42, evening: 82, overnight: 22 },
@@ -921,11 +921,11 @@ const HEREFORD_SOCIAL_POSTS: SocialPostAnalytics[] = [
     "2026-03-15T09:30:00Z", 10),
 ];
 
-// Wye Valley Tours
+// Wicklow Adventure Tours
 const WYE_RADIO_ADS: RadioAdAnalytics[] = [
   {
     adId: "wye-rad-001", adName: "Sunny Weekend — River Adventure", campaignId: "camp-6",
-    brandSlug: "wye-valley-tours", stationSlug: "sunshine-radio", duration: 30,
+    brandSlug: "wicklow-adventure-tours", stationSlug: "sunshine-radio", duration: 30,
     triggerType: "weather", momentTitle: "Sunny weekend forecast",
     popScore: 86, totalPlays: 156, fmPlays: 98, dabPlays: 36, streamingInsertions: 22,
     estimatedReach: 12200, frequency: 2.3,
@@ -936,7 +936,7 @@ const WYE_RADIO_ADS: RadioAdAnalytics[] = [
   },
   {
     adId: "wye-rad-002", adName: "Easter Half-Term — Family Fun", campaignId: "camp-6",
-    brandSlug: "wye-valley-tours", stationSlug: "sunshine-radio", duration: 30,
+    brandSlug: "wicklow-adventure-tours", stationSlug: "sunshine-radio", duration: 30,
     triggerType: "seasonal", momentTitle: "School half-term approaching",
     popScore: 80, totalPlays: 128, fmPlays: 82, dabPlays: 28, streamingInsertions: 18,
     estimatedReach: 10400, frequency: 2.1,
@@ -947,7 +947,7 @@ const WYE_RADIO_ADS: RadioAdAnalytics[] = [
   },
   {
     adId: "wye-rad-003", adName: "Adventure Awaits — Standard", campaignId: "camp-6",
-    brandSlug: "wye-valley-tours", stationSlug: "sunshine-radio", duration: 30,
+    brandSlug: "wicklow-adventure-tours", stationSlug: "sunshine-radio", duration: 30,
     triggerType: "seasonal", momentTitle: "Scheduled campaign spot",
     popScore: 46, totalPlays: 192, fmPlays: 124, dabPlays: 42, streamingInsertions: 26,
     estimatedReach: 14800, frequency: 2.4,
@@ -968,7 +968,7 @@ const WYE_SOCIAL_POSTS: SocialPostAnalytics[] = [
   makeSocialPost("wye-soc-003", "quick-post", "weather", "Spring walks in the valley", 78, true,
     [plat("instagram", 10400, 8000, 520, 38, 98, 130, 260), plat("facebook", 6800, 5000, 260, 20, 46, 0, 140)],
     "2026-03-05T09:30:00Z", 8),
-  makeSocialPost("wye-soc-004", "video", "culture", "Wye Valley literary festival tie-in", 64, true,
+  makeSocialPost("wye-soc-004", "video", "culture", "Dublin literary festival tie-in", 64, true,
     [plat("tiktok", 16200, 12600, 780, 56, 200, 170, 340), plat("instagram", 9800, 7600, 480, 36, 92, 120, 240)],
     "2026-02-22T14:00:00Z", 15),
   makeSocialPost("wye-soc-005", "quick-post", "sport", "Post-match paddle — burn off the calories!", 60, true,
@@ -986,7 +986,7 @@ const WYE_SOCIAL_POSTS: SocialPostAnalytics[] = [
   makeSocialPost("wye-soc-009", "quick-post", "seasonal", "Book early — scheduled", 36, false,
     [plat("facebook", 4000, 2800, 80, 6, 14, 0, 42), plat("instagram", 3200, 2400, 100, 8, 18, 24, 56)],
     "2026-03-15T12:00:00Z", 0),
-  makeSocialPost("wye-soc-010", "blog", "seasonal", "Top 10 Wye Valley walks", 70, true,
+  makeSocialPost("wye-soc-010", "blog", "seasonal", "Top 10 Wicklow walks", 70, true,
     [plat("facebook", 8800, 6400, 340, 28, 62, 0, 180), plat("instagram", 7200, 5400, 360, 28, 72, 92, 200)],
     "2026-01-20T11:00:00Z", 18),
 ];
@@ -1046,7 +1046,7 @@ const HEREFORD_CROSS_MEDIA: CrossMediaAnalytics = {
 };
 
 const WYE_CROSS_MEDIA: CrossMediaAnalytics = {
-  brandSlug: "wye-valley-tours", stationSlug: "sunshine-radio", period: "2026-Q1",
+  brandSlug: "wicklow-adventure-tours", stationSlug: "sunshine-radio", period: "2026-Q1",
   totalRadioReach: 37400, totalSocialReach: 118200, combinedUniqueReach: 128400,
   crossMediaLift: 30, avgPopScore: 70,
   popScoreTrend: generatePopTrend("2026-01-01", 87),
@@ -1104,7 +1104,7 @@ const CROSS_MEDIA_MAP: Record<string, CrossMediaAnalytics> = {
   "tadg-riordan-motors": TADG_CROSS_MEDIA,
   "napoli-kitchen": NAPOLI_CROSS_MEDIA,
   "hereford-financial": HEREFORD_CROSS_MEDIA,
-  "wye-valley-tours": WYE_CROSS_MEDIA,
+  "wicklow-adventure-tours": WYE_CROSS_MEDIA,
   "green-valley-motors": GREEN_VALLEY_CROSS_MEDIA,
 };
 
@@ -1160,7 +1160,7 @@ export function getStationAnalytics(stationSlug: string): StationAnalyticsSummar
     "tadg-riordan-motors": "Tadg Riordan Motors",
     "napoli-kitchen": "Napoli's Kitchen",
     "hereford-financial": "Hereford Financial Advisers",
-    "wye-valley-tours": "Wye Valley Tours",
+    "wicklow-adventure-tours": "Wicklow Adventure Tours",
     "green-valley-motors": "Green Valley Motors",
   };
 
@@ -1168,7 +1168,7 @@ export function getStationAnalytics(stationSlug: string): StationAnalyticsSummar
     "tadg-riordan-motors": "Motoring",
     "napoli-kitchen": "Hospitality",
     "hereford-financial": "Financial Services",
-    "wye-valley-tours": "Tourism & Leisure",
+    "wicklow-adventure-tours": "Tourism & Leisure",
     "green-valley-motors": "Motoring",
   };
 

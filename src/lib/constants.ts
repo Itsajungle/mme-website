@@ -127,7 +127,7 @@ export const USE_CASES = [
   {
     brand: "Tadg Riordan Motors",
     station: "Sunshine Radio",
-    trigger: "Sunny weekend forecast across Herefordshire",
+    trigger: "Sunny weekend forecast across Dublin",
     response: "AI generates convertible promotion ad with dealer voice clone and upbeat music bed",
     result: "3 test drive bookings within 2 hours of broadcast",
     category: "weather",

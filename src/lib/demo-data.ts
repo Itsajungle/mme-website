@@ -246,7 +246,7 @@ export const DEMO_BRANDS: Brand[] = [
     ],
     overview: {
       description:
-        "Authentic Italian restaurant and takeaway serving Herefordshire for 15 years. Known for wood-fired pizza and fresh pasta.",
+        "Authentic Italian restaurant and takeaway serving Dublin for 15 years. Known for wood-fired pizza and fresh pasta.",
       yearsInBusiness: 15,
       peakTimes: ["Friday & Saturday evenings", "Sunday lunch", "Valentine's Day", "Mother's Day"],
       targetAudience: ["Couples", "Families", "Food enthusiasts"],
@@ -280,7 +280,7 @@ export const DEMO_BRANDS: Brand[] = [
     moments: [
       {
         id: "mom-6",
-        title: "Rainy evening forecast for Herefordshire",
+        title: "Rainy evening forecast for Dublin",
         triggerType: "weather",
         popScore: 76,
         timestamp: "4 hours ago",
@@ -452,19 +452,19 @@ export const DEMO_BRANDS: Brand[] = [
   },
   {
     slug: "wye-valley-tours",
-    name: "Wye Valley Tours",
+    name: "Wicklow Adventure Tours",
     sectorId: "tourism",
     sectorName: "Tourism & Leisure",
     stationSlug: "sunshine-radio",
     status: "active",
     epAgentId: "ep-tourism",
     brandAgentId: "brand-wye-valley",
-    logoLine: "Discover the Wye Valley",
+    logoLine: "Discover Wicklow",
     locations: [
-      { name: "Wye Valley Tours HQ", address: "Symonds Yat, Ross-on-Wye, HR9 6JL" },
+      { name: "Wicklow Adventure Tours HQ", address: "Laragh, Co. Wicklow, Ireland" },
     ],
     overview: {
-      description: "Adventure tourism company offering kayaking, canoeing, and guided walks in the Wye Valley.",
+      description: "Adventure tourism company offering kayaking, canoeing, and guided walks in the Wicklow Mountains.",
       yearsInBusiness: 8,
       peakTimes: ["Easter to October", "School holidays", "Sunny weekends"],
       targetAudience: ["Families", "Adventure seekers", "Tourists"],
@@ -477,11 +477,11 @@ export const DEMO_BRANDS: Brand[] = [
       brandMusic: "Adventure folk guitar",
       additionalMusic: ["Calm river ambience"],
       sfx: ["Water splash", "Bird call", "Paddle stroke"],
-      logoLine: "Discover the Wye Valley",
+      logoLine: "Discover Wicklow",
     },
     socialProfile: {
       tone: "Adventurous, inspiring, nature-loving",
-      hashtags: ["#WyeValleyTours", "#WyeValley", "#AdventureWaits", "#KayakLife", "#VisitHerefordshire"],
+      hashtags: ["#WicklowAdventures", "#Wicklow", "#AdventureWaits", "#KayakLife", "#VisitWicklow"],
       imageStyle: "Action shots on water, stunning valley landscapes, happy groups outdoors",
       bestPlatforms: ["instagram", "tiktok", "facebook"],
     },
@@ -502,7 +502,7 @@ export const DEMO_BRANDS: Brand[] = [
         triggerType: "weather",
         popScore: 92,
         timestamp: "1 hour ago",
-        description: "Sunny weekend forecast with clear skies across the Wye Valley — peak conditions for kayaking and guided walks.",
+        description: "Sunny weekend forecast with clear skies across Co. Wicklow — peak conditions for kayaking and guided walks.",
         suggestedAction: "Launch urgent weekend availability campaign — 'perfect conditions this weekend, book now before spots fill'",
       },
       {
@@ -521,7 +521,7 @@ export const DEMO_BRANDS: Brand[] = [
         popScore: 67,
         timestamp: "5 hours ago",
         description: "Local tourism awards nominations are now open — opportunity to build reputation and community engagement.",
-        suggestedAction: "Run social campaign asking customers to nominate Wye Valley Tours — 'we love what we do, tell them why'",
+        suggestedAction: "Run social campaign asking customers to nominate Wicklow Adventure Tours — 'we love what we do, tell them why'",
       },
     ],
     lastActivity: "2026-03-24",

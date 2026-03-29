@@ -59,7 +59,7 @@ const DEMO_ENTRIES: CrossMediaEntry[] = [
   {
     id: "cme-2",
     momentId: "mom-6",
-    momentTitle: "Rainy evening forecast for Herefordshire",
+    momentTitle: "Rainy evening forecast for Dublin",
     momentTriggerType: "news",
     brandSlug: "napoli-kitchen",
     brandName: "Napoli's Kitchen",
