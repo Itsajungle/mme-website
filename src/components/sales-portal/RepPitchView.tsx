@@ -1,14 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { X, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   MOCK_CLIENTS,
   SALES_REPS,
   type MockClient,
   type PipelineStageId,
-  type SalesRep,
 } from "@/lib/sales-portal/demo-data";
 
 const TEMP_COLORS: Record<string, string> = {
@@ -34,8 +33,7 @@ const PITCH_ZONES: PitchZone[] = [
 ];
 
 interface RepPitchViewProps {
-  repId: string;
-  onClose: () => void;
+  filterRepId?: string | null;
 }
 
 function DealCard({ client }: { client: MockClient }) {
@@ -68,9 +66,12 @@ function DealCard({ client }: { client: MockClient }) {
   );
 }
 
-export function RepPitchView({ repId, onClose }: RepPitchViewProps) {
-  const rep = SALES_REPS.find((r) => r.id === repId) as SalesRep;
-  const repClients = MOCK_CLIENTS.filter((c) => c.assignedRep === repId);
+export function RepPitchView({ filterRepId }: RepPitchViewProps) {
+  const repClients = filterRepId
+    ? MOCK_CLIENTS.filter((c) => c.assignedRep === filterRepId)
+    : MOCK_CLIENTS;
+
+  const rep = filterRepId ? SALES_REPS.find((r) => r.id === filterRepId) : null;
   const totalPipeline = repClients.reduce((s, c) => s + c.annualValue, 0);
   const closedValue = repClients
     .filter((c) => c.pipelineStage === "closed")
@@ -83,136 +84,125 @@ export function RepPitchView({ repId, onClose }: RepPitchViewProps) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(4, 8, 16, 0.9)" }}
+      className="space-y-4"
     >
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 30, scale: 0.95 }}
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10"
-        style={{ backgroundColor: "#040810" }}
-      >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white/60 hover:text-white hover:bg-white/20 transition-colors"
-        >
-          <X size={16} />
-        </button>
-
-        {/* Scoreboard */}
-        <div className="px-6 py-5 border-b border-white/10 flex items-center gap-4">
-          <div
-            className={cn(
-              "h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0",
-              rep.avatarColor
-            )}
-          >
-            {rep.initials}
-          </div>
+      {/* Scoreboard */}
+      <div className="rounded-xl border border-border bg-bg-card px-6 py-5 flex items-center gap-4">
+        {rep ? (
+          <>
+            <div
+              className={cn(
+                "h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0",
+                rep.avatarColor
+              )}
+            >
+              {rep.initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-heading text-lg font-bold text-text">
+                {rep.name}&apos;s Pitch
+              </h2>
+              <p className="text-xs text-text-muted">{rep.role} · {rep.sectorFocus}</p>
+            </div>
+          </>
+        ) : (
           <div className="flex-1 min-w-0">
-            <h2 className="font-heading text-lg font-bold text-white">
-              {rep.name}&apos;s Pitch
-            </h2>
-            <p className="text-xs text-white/50">{rep.role} · {rep.sectorFocus}</p>
+            <h2 className="font-heading text-lg font-bold text-text">The Pitch</h2>
+            <p className="text-xs text-text-muted">All reps · Full pipeline view</p>
           </div>
-          <div className="text-right shrink-0">
-            <div className="flex items-center gap-1.5 justify-end">
-              <TrendingUp size={14} className="text-[#00FF96]" />
-              <span className="text-xl font-mono font-bold text-[#00FF96]">
-                €{(totalPipeline / 1000).toFixed(0)}K
-              </span>
+        )}
+        <div className="text-right shrink-0">
+          <div className="flex items-center gap-1.5 justify-end">
+            <TrendingUp size={14} className="text-[#00FF96]" />
+            <span className="text-xl font-mono font-bold text-[#00FF96]">
+              €{(totalPipeline / 1000).toFixed(0)}K
+            </span>
+          </div>
+          <p className="text-[10px] text-text-muted mt-0.5">
+            {repClients.length} deals · €{(closedValue / 1000).toFixed(0)}K closed
+          </p>
+        </div>
+      </div>
+
+      {/* Football Pitch */}
+      <div
+        className="relative rounded-xl overflow-hidden border-2 border-white/30"
+        style={{
+          background:
+            "linear-gradient(180deg, #1a5c2a 0%, #1e6b30 15%, #1a5c2a 30%, #1e6b30 45%, #1a5c2a 60%, #1e6b30 75%, #1a5c2a 90%, #1e6b30 100%)",
+        }}
+      >
+        {PITCH_ZONES.map((zone) => {
+          const deals = clientsByStage(zone.stageId);
+          const isGoal = zone.stageId === "closed";
+          const isKickOff = zone.stageId === "first-contact";
+
+          return (
+            <div
+              key={zone.stageId}
+              className={cn(
+                "relative border-b border-white/20 last:border-b-0",
+                isGoal && "min-h-[100px]",
+                !isGoal && "min-h-[90px]"
+              )}
+            >
+              {/* Goal mouth markings */}
+              {isGoal && (
+                <>
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[40%] h-[40px] border-b-2 border-x-2 border-white/30 rounded-b-lg" />
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[20%] h-[20px] border-b-2 border-x-2 border-white/30 rounded-b-md" />
+                </>
+              )}
+
+              {/* Centre circle for midfield */}
+              {zone.stageId === "demo-booked" && (
+                <>
+                  <div className="absolute top-0 left-0 right-0 border-t-2 border-white/20" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80px] h-[80px] rounded-full border-2 border-white/20" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white/30" />
+                </>
+              )}
+
+              {/* Kick-off markings */}
+              {isKickOff && (
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[40%] h-[30px] border-t-2 border-x-2 border-white/30 rounded-t-lg" />
+              )}
+
+              {/* Zone label */}
+              <div className="absolute top-2 left-3">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">
+                  {zone.pitchLabel}
+                </span>
+              </div>
+
+              {/* Deal cards */}
+              <div className="relative z-10 flex flex-wrap gap-2 px-4 pt-7 pb-3 justify-center">
+                {deals.map((client) => (
+                  <DealCard key={client.id} client={client} />
+                ))}
+                {deals.length === 0 && (
+                  <span className="text-[10px] text-white/20 italic py-2">
+                    No deals
+                  </span>
+                )}
+              </div>
             </div>
-            <p className="text-[10px] text-white/40 mt-0.5">
-              {repClients.length} deals · €{(closedValue / 1000).toFixed(0)}K closed
-            </p>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="rounded-xl border border-border bg-bg-card px-6 py-3 flex items-center gap-4 flex-wrap">
+        {(["hot", "warm", "cool", "landed"] as const).map((temp) => (
+          <div key={temp} className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: TEMP_COLORS[temp] }}
+            />
+            <span className="text-[10px] text-text-muted capitalize">{temp}</span>
           </div>
-        </div>
-
-        {/* Football Pitch */}
-        <div className="p-4">
-          <div
-            className="relative rounded-xl overflow-hidden border-2 border-white/30"
-            style={{
-              background:
-                "linear-gradient(180deg, #1a5c2a 0%, #1e6b30 15%, #1a5c2a 30%, #1e6b30 45%, #1a5c2a 60%, #1e6b30 75%, #1a5c2a 90%, #1e6b30 100%)",
-            }}
-          >
-            {PITCH_ZONES.map((zone, zIdx) => {
-              const deals = clientsByStage(zone.stageId);
-              const isGoal = zone.stageId === "closed";
-              const isKickOff = zone.stageId === "first-contact";
-
-              return (
-                <div
-                  key={zone.stageId}
-                  className={cn(
-                    "relative border-b border-white/20 last:border-b-0",
-                    isGoal && "min-h-[100px]",
-                    !isGoal && "min-h-[90px]"
-                  )}
-                >
-                  {/* Goal mouth markings */}
-                  {isGoal && (
-                    <>
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[40%] h-[40px] border-b-2 border-x-2 border-white/30 rounded-b-lg" />
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[20%] h-[20px] border-b-2 border-x-2 border-white/30 rounded-b-md" />
-                    </>
-                  )}
-
-                  {/* Centre circle for midfield */}
-                  {zone.stageId === "demo-booked" && (
-                    <>
-                      <div className="absolute top-0 left-0 right-0 border-t-2 border-white/20" />
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80px] h-[80px] rounded-full border-2 border-white/20" />
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white/30" />
-                    </>
-                  )}
-
-                  {/* Kick-off markings */}
-                  {isKickOff && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[40%] h-[30px] border-t-2 border-x-2 border-white/30 rounded-t-lg" />
-                  )}
-
-                  {/* Zone label */}
-                  <div className="absolute top-2 left-3">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">
-                      {zone.pitchLabel}
-                    </span>
-                  </div>
-
-                  {/* Deal cards */}
-                  <div className="relative z-10 flex flex-wrap gap-2 px-4 pt-7 pb-3 justify-center">
-                    {deals.map((client) => (
-                      <DealCard key={client.id} client={client} />
-                    ))}
-                    {deals.length === 0 && (
-                      <span className="text-[10px] text-white/20 italic py-2">
-                        No deals
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="px-6 py-3 border-t border-white/10 flex items-center gap-4 flex-wrap">
-          {(["hot", "warm", "cool", "landed"] as const).map((temp) => (
-            <div key={temp} className="flex items-center gap-1.5">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: TEMP_COLORS[temp] }}
-              />
-              <span className="text-[10px] text-white/50 capitalize">{temp}</span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
+        ))}
+      </div>
     </motion.div>
   );
 }

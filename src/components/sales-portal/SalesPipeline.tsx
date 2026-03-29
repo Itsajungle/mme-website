@@ -27,9 +27,17 @@ function formatValue(v: number): string {
   return v >= 1000 ? `€${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K` : `€${v}`;
 }
 
-export function SalesPipeline() {
+interface SalesPipelineProps {
+  filterRepId?: string | null;
+}
+
+export function SalesPipeline({ filterRepId }: SalesPipelineProps = {}) {
+  const filteredClients = filterRepId
+    ? MOCK_CLIENTS.filter((c) => c.assignedRep === filterRepId)
+    : MOCK_CLIENTS;
+
   const clientsByStage = (stageId: PipelineStageId) =>
-    MOCK_CLIENTS.filter((c) => c.pipelineStage === stageId);
+    filteredClients.filter((c) => c.pipelineStage === stageId);
 
   return (
     <div className="space-y-4">
@@ -37,7 +45,7 @@ export function SalesPipeline() {
         <div>
           <h2 className="font-heading text-xl font-bold text-text">Sales Pipeline</h2>
           <p className="text-sm text-text-muted mt-0.5">
-            {MOCK_CLIENTS.length} leads · €{(MOCK_CLIENTS.reduce((s, c) => s + c.annualValue, 0) / 1000).toFixed(0)}K total pipeline
+            {filteredClients.length} leads · €{(filteredClients.reduce((s, c) => s + c.annualValue, 0) / 1000).toFixed(0)}K total pipeline
           </p>
         </div>
         <div className="flex items-center gap-3 text-[10px] font-medium">

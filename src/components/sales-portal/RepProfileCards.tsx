@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SALES_REPS, MOCK_CLIENTS } from "@/lib/sales-portal/demo-data";
 import { Phone, Monitor, Trophy, TrendingUp } from "lucide-react";
-import { RepPitchView } from "./RepPitchView";
 
 export function RepProfileCards() {
-  const [pitchRepId, setPitchRepId] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
@@ -26,8 +22,7 @@ export function RepProfileCards() {
           return (
             <div
               key={rep.id}
-              onClick={() => setPitchRepId(rep.id)}
-              className="rounded-xl border border-border bg-bg-card overflow-hidden transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 cursor-pointer group"
+              className="rounded-xl border border-border bg-bg-card overflow-hidden transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 group"
             >
               {/* Header */}
               <div className="px-5 py-4 border-b border-border flex items-center gap-4">
@@ -111,12 +106,6 @@ export function RepProfileCards() {
         })}
       </div>
 
-      {/* Pitch View Modal */}
-      <AnimatePresence>
-        {pitchRepId && (
-          <RepPitchView repId={pitchRepId} onClose={() => setPitchRepId(null)} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
