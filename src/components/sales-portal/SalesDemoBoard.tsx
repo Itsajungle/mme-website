@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { QuickBriefForm } from "./QuickBriefForm";
 import { ScriptEditor } from "./ScriptEditor";
 import { SalesActivityFeed } from "./SalesActivityFeed";
+import { RepSelector } from "./RepSelector";
 import type {
   DemoAdBrief,
   GenerateResponse,
@@ -30,13 +31,64 @@ import type {
   PipelineStep,
 } from "@/lib/sales-portal/types";
 import { PIPELINE_LABELS } from "@/lib/sales-portal/types";
+import { DEMO_REPS } from "@/lib/sales-portal/demo-reps";
 
 interface SalesDemoBoardProps {
   stationId: string;
   stationName: string;
 }
 
+// Seeded demo activities so the demo doesn't start empty
+const SEEDED_ACTIVITIES: DemoAdActivity[] = [
+  {
+    id: "seed-1",
+    adId: "seed-1",
+    repId: "rep-sarah-murphy",
+    advertiserName: "Riordan Motors",
+    businessType: "Automotive",
+    tone: "friendly",
+    duration: 30,
+    mode: "automated",
+    comptrodScore: 84,
+    status: "complete",
+    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    audioUrl: undefined,
+  },
+  {
+    id: "seed-2",
+    adId: "seed-2",
+    repId: "rep-sarah-murphy",
+    advertiserName: "Dublin Airport Parking",
+    businessType: "Tourism",
+    tone: "urgent",
+    duration: 15,
+    mode: "automated",
+    comptrodScore: 78,
+    status: "complete",
+    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    audioUrl: undefined,
+  },
+  {
+    id: "seed-3",
+    adId: "seed-3",
+    repId: "rep-aoife-brennan",
+    advertiserName: "Grafton Quarter",
+    businessType: "Retail",
+    tone: "professional",
+    duration: 30,
+    mode: "automated",
+    comptrodScore: 87,
+    status: "complete",
+    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+    audioUrl: undefined,
+  },
+];
+
 export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) {
+  // Rep selector state
+  const [selectedRepId, setSelectedRepId] = useState(DEMO_REPS[0].id);
+  const selectedRep = DEMO_REPS.find((r) => r.id === selectedRepId)!;
+
   // Pipeline state
   const [pipelineStep, setPipelineStep] = useState<PipelineStep>("idle");
   const [generating, setGenerating] = useState(false);
@@ -52,8 +104,11 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
   const [muted, setMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Activity feed
-  const [activities, setActivities] = useState<DemoAdActivity[]>([]);
+  // Activity feed (seeded with demo data)
+  const [activities, setActivities] = useState<DemoAdActivity[]>(SEEDED_ACTIVITIES);
+
+  // Filter activities for the selected rep
+  const repActivities = activities.filter((a) => a.repId === selectedRepId);
 
   // ── Pipeline simulation ─────────────────────────────────
 
@@ -113,6 +168,7 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
         {
           id: data.adId,
           adId: data.adId,
+          repId: selectedRepId,
           advertiserName: data.advertiserName,
           businessType: data.businessType,
           tone: data.tone,
@@ -132,7 +188,7 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
     } finally {
       setGenerating(false);
     }
-  }, []);
+  }, [selectedRepId]);
 
   // ── Generate Audio (Hybrid) ─────────────────────────────
 
@@ -156,7 +212,7 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
             tone: currentAd.tone,
             businessType: currentAd.businessType,
             stationId,
-            repId: "demo-rep",
+            repId: selectedRepId,
           }),
         });
 
@@ -199,7 +255,7 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
         setGeneratingAudio(false);
       }
     },
-    [currentAd, stationId]
+    [currentAd, stationId, selectedRepId]
   );
 
   // ── Audio Controls ──────────────────────────────────────
@@ -238,6 +294,9 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
 
   return (
     <div className="space-y-6">
+      {/* Rep Selector */}
+      <RepSelector selectedRepId={selectedRepId} onSelectRep={setSelectedRepId} />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -342,7 +401,7 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
               <QuickBriefForm
                 key="form"
                 stationId={stationId}
-                repId="demo-rep"
+                repId={selectedRepId}
                 onSubmit={handleGenerate}
                 loading={generating}
                 disabled={generating}
@@ -489,7 +548,7 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
 
         {/* Right Column: Activity Feed */}
         <div className="space-y-6">
-          <SalesActivityFeed activities={activities} onPlayAudio={handlePlayActivity} />
+          <SalesActivityFeed activities={repActivities} onPlayAudio={handlePlayActivity} />
         </div>
       </div>
     </div>

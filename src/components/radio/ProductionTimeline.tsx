@@ -103,6 +103,15 @@ export function ProductionTimeline({
     }
   }, [externalSegments]);
 
+  // Drag state
+  const [dragging, setDragging] = useState<{
+    segId: string;
+    type: "move" | "resize-left" | "resize-right";
+    startX: number;
+    origStart: number;
+    origEnd: number;
+  } | null>(null);
+
   // Global pointer handlers so drag works even when pointer leaves track area
   useEffect(() => {
     if (!dragging) return;
@@ -174,15 +183,6 @@ export function ProductionTimeline({
       newMap.forEach(audio => { audio.pause(); audio.src = ""; });
     };
   }, [segments]);
-
-  // Drag state
-  const [dragging, setDragging] = useState<{
-    segId: string;
-    type: "move" | "resize-left" | "resize-right";
-    startX: number;
-    origStart: number;
-    origEnd: number;
-  } | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const playbackRef = useRef<number | null>(null);

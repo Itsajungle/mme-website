@@ -150,6 +150,7 @@ export interface GenerateAudioResponse {
 export interface DemoAdActivity {
   id: string;
   adId: string;
+  repId: string;
   advertiserName: string;
   businessType: string;
   tone: string;
