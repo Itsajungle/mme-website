@@ -103,6 +103,51 @@ export function ProductionTimeline({
     }
   }, [externalSegments]);
 
+  // Global pointer handlers so drag works even when pointer leaves track area
+  useEffect(() => {
+    if (!dragging) return;
+
+    const onMove = (e: PointerEvent) => {
+      if (!timelineRef.current) return;
+      const rect = timelineRef.current.getBoundingClientRect();
+      const pixelsPerSecond = (rect.width * zoom) / totalSeconds;
+      const dx = e.clientX - dragging.startX;
+      const dt = dx / pixelsPerSecond;
+
+      setSegments((prev) =>
+        prev.map((seg) => {
+          if (seg.id !== dragging.segId) return seg;
+          if (dragging.type === "move") {
+            const duration = dragging.origEnd - dragging.origStart;
+            let newStart = snapToGrid(dragging.origStart + dt);
+            newStart = Math.max(0, Math.min(totalSeconds - duration, newStart));
+            return { ...seg, start: newStart, end: newStart + duration };
+          } else if (dragging.type === "resize-left") {
+            let newStart = snapToGrid(dragging.origStart + dt);
+            newStart = Math.max(0, Math.min(dragging.origEnd - MIN_SEGMENT_LENGTH, newStart));
+            return { ...seg, start: newStart };
+          } else {
+            let newEnd = snapToGrid(dragging.origEnd + dt);
+            newEnd = Math.max(dragging.origStart + MIN_SEGMENT_LENGTH, Math.min(totalSeconds, newEnd));
+            return { ...seg, end: newEnd };
+          }
+        })
+      );
+    };
+
+    const onUp = () => {
+      setDragging(null);
+      onSegmentsChange?.(segmentsRef.current);
+    };
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+  }, [dragging, totalSeconds, zoom, onSegmentsChange]);
+
   // Create/cleanup Audio elements when segments change
   useEffect(() => {
     const newMap = new Map<string, HTMLAudioElement>();
@@ -313,9 +358,9 @@ export function ProductionTimeline({
   const handlePointerUp = useCallback(() => {
     if (dragging) {
       setDragging(null);
-      onSegmentsChange?.(segments);
+      onSegmentsChange?.(segmentsRef.current);
     }
-  }, [dragging, segments, onSegmentsChange]);
+  }, [dragging, onSegmentsChange]);
 
   // Ruler click to set playhead
   const handleRulerClick = useCallback(
@@ -473,7 +518,7 @@ export function ProductionTimeline({
       </div>
 
       {/* Timeline */}
-      <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
+      <div className="rounded-xl border border-border bg-bg-card overflow-x-auto overflow-y-hidden">
         {/* Timeline Ruler */}
         <div className="flex border-b border-border">
           <div className="w-28 shrink-0 border-r border-border bg-bg-deep" />
@@ -558,8 +603,7 @@ export function ProductionTimeline({
               <div
                 className="relative flex-1 py-2 px-1 min-h-[52px]"
                 style={{ minWidth: `${zoom * 100}%` }}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
+                
               >
                 {trackSegments.map((segment) => {
                   const isDucked = segment.ducking?.underVoice;
