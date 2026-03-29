@@ -119,7 +119,7 @@ export function ProductionTimeline({
     const onMove = (e: PointerEvent) => {
       if (!timelineRef.current) return;
       const rect = timelineRef.current.getBoundingClientRect();
-      const pixelsPerSecond = (rect.width * zoom) / totalSeconds;
+      const pixelsPerSecond = rect.width / totalSeconds;
       const dx = e.clientX - dragging.startX;
       const dt = dx / pixelsPerSecond;
 
