@@ -1,5 +1,22 @@
 import { NextResponse } from "next/server";
-import { getCanvaService } from "@/lib/canva/canva-service";
+import { cookies } from "next/headers";
+import {
+  getCanvaService,
+  decryptPKCE,
+  PKCE_COOKIE_NAME,
+} from "@/lib/canva/canva-service";
+
+function getBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    "https://momentmarketingengine.com"
+  );
+}
+
+function redirectUrl(path: string): string {
+  return `${getBaseUrl()}${path}`;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,37 +26,78 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(
+      redirectUrl(
         `/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=error&reason=${encodeURIComponent(error)}`,
-        request.url,
       ),
     );
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL(
+      redirectUrl(
         "/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=error&reason=missing_params",
-        request.url,
       ),
     );
   }
 
   try {
-    const canva = getCanvaService();
-    await canva.exchangeCode(code, state);
+    // Read PKCE data from encrypted cookie
+    const cookieStore = await cookies();
+    const pkceCookie = cookieStore.get(PKCE_COOKIE_NAME)?.value;
 
-    return NextResponse.redirect(
-      new URL(
+    if (!pkceCookie) {
+      console.error("[Canva OAuth] PKCE cookie not found");
+      return NextResponse.redirect(
+        redirectUrl(
+          "/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=error&reason=missing_pkce",
+        ),
+      );
+    }
+
+    const pkceData = decryptPKCE(pkceCookie);
+    if (!pkceData) {
+      console.error("[Canva OAuth] Failed to decrypt PKCE cookie");
+      return NextResponse.redirect(
+        redirectUrl(
+          "/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=error&reason=invalid_pkce",
+        ),
+      );
+    }
+
+    // Verify state matches
+    if (pkceData.state !== state) {
+      console.error("[Canva OAuth] State mismatch");
+      return NextResponse.redirect(
+        redirectUrl(
+          "/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=error&reason=state_mismatch",
+        ),
+      );
+    }
+
+    const canva = getCanvaService();
+    const { brandId } = await canva.exchangeCode(
+      code,
+      state,
+      pkceData.codeVerifier,
+      pkceData.brandId,
+    );
+    console.log(
+      `[Canva OAuth] Token exchange succeeded for brand: ${brandId}`,
+    );
+
+    // Clear the PKCE cookie and redirect
+    const response = NextResponse.redirect(
+      redirectUrl(
         "/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=connected",
-        request.url,
       ),
     );
-  } catch {
+    response.cookies.delete(PKCE_COOKIE_NAME);
+    return response;
+  } catch (err) {
+    console.error("[Canva OAuth] Token exchange failed:", err);
     return NextResponse.redirect(
-      new URL(
+      redirectUrl(
         "/dashboard/station/sunshine-radio/brand/riordan-motors/social?canva=error&reason=exchange_failed",
-        request.url,
       ),
     );
   }

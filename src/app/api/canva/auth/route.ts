@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCanvaService } from "@/lib/canva/canva-service";
+import {
+  getCanvaService,
+  PKCE_COOKIE_NAME,
+} from "@/lib/canva/canva-service";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +16,16 @@ export async function GET(request: Request) {
   }
 
   const canva = getCanvaService();
-  const authUrl = canva.getAuthorizationUrl(brandId);
+  const { authUrl, pkceCookie } = canva.getAuthorizationUrl(brandId);
 
-  return NextResponse.redirect(authUrl);
+  const response = NextResponse.redirect(authUrl);
+  response.cookies.set(PKCE_COOKIE_NAME, pkceCookie, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600, // 10 minutes
+  });
+
+  return response;
 }

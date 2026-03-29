@@ -4,19 +4,59 @@ const CANVA_API_BASE = "https://api.canva.com/rest/v1";
 const CANVA_AUTH_URL = "https://www.canva.com/api/oauth/authorize";
 const CANVA_TOKEN_URL = `${CANVA_API_BASE}/oauth/token`;
 
-// In-memory PKCE store (state → { codeVerifier, brandId, createdAt })
-const pkceStore = new Map<
-  string,
-  { codeVerifier: string; brandId: string; createdAt: number }
->();
-const PKCE_TTL = 600_000; // 10 minutes
+// PKCE helpers — encrypt into a cookie so it survives across requests
+const PKCE_COOKIE = "canva_pkce";
 
-function cleanupExpiredPKCE() {
-  const now = Date.now();
-  for (const [state, entry] of pkceStore) {
-    if (now - entry.createdAt > PKCE_TTL) pkceStore.delete(state);
+function getEncryptionKey(): Buffer {
+  // Use first 32 bytes of CANVA_CLIENT_SECRET as AES-256 key
+  const secret = process.env.CANVA_CLIENT_SECRET || "";
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+export function encryptPKCE(data: {
+  codeVerifier: string;
+  brandId: string;
+  state: string;
+}): string {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const json = JSON.stringify(data);
+  const encrypted = Buffer.concat([
+    cipher.update(json, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+  // iv:tag:ciphertext (all base64url)
+  return [
+    iv.toString("base64url"),
+    tag.toString("base64url"),
+    encrypted.toString("base64url"),
+  ].join(".");
+}
+
+export function decryptPKCE(
+  token: string,
+): { codeVerifier: string; brandId: string; state: string } | null {
+  try {
+    const key = getEncryptionKey();
+    const [ivB64, tagB64, dataB64] = token.split(".");
+    const iv = Buffer.from(ivB64, "base64url");
+    const tag = Buffer.from(tagB64, "base64url");
+    const encrypted = Buffer.from(dataB64, "base64url");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]);
+    return JSON.parse(decrypted.toString("utf8"));
+  } catch {
+    return null;
   }
 }
+
+export const PKCE_COOKIE_NAME = PKCE_COOKIE;
 
 function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
   const verifier = crypto.randomBytes(48).toString("base64url");
@@ -55,11 +95,17 @@ export class CanvaService {
     this.redirectUri = process.env.CANVA_REDIRECT_URI!;
   }
 
-  getAuthorizationUrl(brandId: string): string {
-    cleanupExpiredPKCE();
+  /**
+   * Returns { authUrl, pkceCookie } — caller must set the cookie on the response.
+   */
+  getAuthorizationUrl(brandId: string): {
+    authUrl: string;
+    pkceCookie: string;
+  } {
     const { codeVerifier, codeChallenge } = generatePKCE();
     const state = crypto.randomBytes(24).toString("base64url");
-    pkceStore.set(state, { codeVerifier, brandId, createdAt: Date.now() });
+
+    const pkceCookie = encryptPKCE({ codeVerifier, brandId, state });
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -71,20 +117,26 @@ export class CanvaService {
       code_challenge_method: "S256",
     });
 
-    return `${CANVA_AUTH_URL}?${params.toString()}`;
+    return {
+      authUrl: `${CANVA_AUTH_URL}?${params.toString()}`,
+      pkceCookie,
+    };
   }
 
   async exchangeCode(
     code: string,
     state: string,
+    codeVerifier: string,
+    brandId: string,
   ): Promise<{ brandId: string }> {
-    const entry = pkceStore.get(state);
-    if (!entry) throw new Error("Invalid or expired state parameter");
-    pkceStore.delete(state);
-
     const basicAuth = Buffer.from(
       `${this.clientId}:${this.clientSecret}`,
     ).toString("base64");
+
+    console.log(
+      "[Canva OAuth] Exchanging code with redirect_uri:",
+      this.redirectUri,
+    );
 
     const res = await fetch(CANVA_TOKEN_URL, {
       method: "POST",
@@ -96,25 +148,26 @@ export class CanvaService {
         grant_type: "authorization_code",
         code,
         redirect_uri: this.redirectUri,
-        code_verifier: entry.codeVerifier,
+        code_verifier: codeVerifier,
       }),
     });
 
     if (!res.ok) {
       const text = await res.text();
+      console.error("[Canva OAuth] Token exchange error:", res.status, text);
       throw new Error(`Token exchange failed: ${res.status} ${text}`);
     }
 
     const data = await res.json();
     const expiresAt = new Date(Date.now() + data.expires_in * 1000);
     await this.storeTokens(
-      entry.brandId,
+      brandId,
       data.access_token,
       data.refresh_token,
       expiresAt,
     );
 
-    return { brandId: entry.brandId };
+    return { brandId };
   }
 
   async getValidToken(brandId: string): Promise<string> {
