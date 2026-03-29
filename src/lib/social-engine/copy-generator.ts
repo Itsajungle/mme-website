@@ -109,6 +109,7 @@ BRAND:
 - Target audience: ${params.brandTargetAudience.join(", ")}
 ${params.promotion ? `- Current promotion: ${params.promotion}` : ""}
 ${params.customPrompt ? `- Additional direction: ${params.customPrompt}` : ""}
+${params.brandKitContext ?? ""}
 
 MOMENT:
 ${momentContext}

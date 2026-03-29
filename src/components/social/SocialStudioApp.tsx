@@ -30,14 +30,18 @@ import {
 import { cn } from "@/lib/utils";
 import type { Brand } from "@/lib/demo-data";
 import type { PublishResult } from "@/lib/social-engine/types";
+import type { SocialBrandKit as SocialBrandKitType } from "@/lib/social-engine/brand-kit-types";
+import { DEFAULT_SOCIAL_BRAND_KIT } from "@/lib/social-engine/brand-kit-types";
 import { ContentPreview } from "./ContentPreview";
 import { PipelineStatus } from "./PipelineStatus";
+import { SocialBrandKit } from "./SocialBrandKit";
 
 interface SocialStudioAppProps {
   brand: Brand;
 }
 
 const MODES = [
+  { id: "brandkit", label: "Brand Kit", icon: Palette },
   { id: "quick", label: "Quick Post", icon: FileText },
   { id: "video", label: "Video Post", icon: Video },
   { id: "slideshow", label: "Slideshow", icon: Layers },
@@ -166,7 +170,8 @@ function ErrorBanner({
 
 // ── Main component ────────────────────────────────────────────────────────
 export function SocialStudioApp({ brand }: SocialStudioAppProps) {
-  const [mode, setMode] = useState<Mode>("quick");
+  const [mode, setMode] = useState<Mode>("brandkit");
+  const [socialBrandKit, setSocialBrandKit] = useState<SocialBrandKitType>(DEFAULT_SOCIAL_BRAND_KIT);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["instagram"]);
 
   // Quick post state
@@ -255,6 +260,12 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
           platforms: selectedPlatforms,
           contentType: mode === "video" ? "video_script" : "quick",
           customPrompt: aiPromptText || undefined,
+          brandColors: {
+            primary: socialBrandKit.primaryColor,
+            secondary: socialBrandKit.secondaryColor,
+            accent: socialBrandKit.accentColor,
+          },
+          brandTagline: socialBrandKit.tagline || undefined,
         }),
       });
       if (!res.ok) throw new Error("Generation failed");
@@ -423,8 +434,8 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
         })}
       </div>
 
-      {/* Platform selector — hide for coming-soon modes */}
-      {!isComingSoon && (
+      {/* Platform selector — hide for coming-soon modes and brandkit */}
+      {!isComingSoon && mode !== "brandkit" && (
         <div className="px-6 pb-4">
           <p className="text-[10px] uppercase tracking-wider text-text-muted font-mono mb-2">
             Platforms
@@ -454,7 +465,15 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
         </div>
       )}
 
+      {/* Brand Kit — full width when selected */}
+      {mode === "brandkit" && (
+        <div className="border-t border-border">
+          <SocialBrandKit kit={socialBrandKit} onUpdate={setSocialBrandKit} brand={brand} />
+        </div>
+      )}
+
       {/* Main content area */}
+      {mode !== "brandkit" && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 border-t border-border">
         {/* ── Editor panel ── */}
         <div className="p-6 border-b lg:border-b-0 lg:border-r border-border relative">
@@ -965,8 +984,10 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
           )}
         </div>
       </div>
+      )}
 
       {/* Pipeline + Actions */}
+      {mode !== "brandkit" && (
       <div className="border-t border-border px-6 py-5 space-y-5">
         {/* Pipeline status */}
         <div className="pb-4">
@@ -1009,6 +1030,7 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

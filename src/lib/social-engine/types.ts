@@ -128,6 +128,7 @@ export interface SocialContentParams {
   contentType: "quick" | "video_script";
   customPrompt?: string;
   existingRadioScript?: string;
+  brandKitContext?: string;
 }
 
 export interface QualityScore {

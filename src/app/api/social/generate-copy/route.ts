@@ -5,7 +5,10 @@ import type { CopyGenerationRequest } from "@/lib/social-engine/types";
 export async function POST(request: Request) {
   try {
     const body: CopyGenerationRequest = await request.json();
-    const { brandSlug, momentId, momentContext, promotion, platforms, contentType, customPrompt } = body;
+    const { brandSlug, momentId, momentContext, promotion, platforms, contentType, customPrompt, brandColors, brandTagline } = body as CopyGenerationRequest & {
+      brandColors?: { primary: string; secondary: string; accent: string };
+      brandTagline?: string;
+    };
 
     if (!brandSlug || !platforms || !contentType) {
       return Response.json(
@@ -33,6 +36,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Build brand kit context string for the quality chain
+    const brandKitParts: string[] = [];
+    if (brandTagline) brandKitParts.push(`Brand tagline: "${brandTagline}"`);
+    if (brandColors) {
+      brandKitParts.push(`Brand colours — primary: ${brandColors.primary}, secondary: ${brandColors.secondary}, accent: ${brandColors.accent}`);
+    }
+    const brandKitContext = brandKitParts.length > 0
+      ? `\n\nBrand Kit Context:\n${brandKitParts.join("\n")}`
+      : undefined;
+
     const result = await runSocialQualityChain({
       brandName: brand.name,
       brandSector: brand.sectorName,
@@ -47,6 +60,7 @@ export async function POST(request: Request) {
       platforms,
       contentType,
       customPrompt,
+      brandKitContext,
     });
 
     return Response.json(result);

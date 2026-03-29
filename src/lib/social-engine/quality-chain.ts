@@ -88,6 +88,7 @@ BRAND CONTEXT:
 - Target audience: ${params.brandTargetAudience.join(", ")}
 ${params.momentTitle ? `- Moment: "${params.momentTitle}" — ${params.momentDescription ?? ""}` : "- No specific moment"}
 ${params.promotion ? `- Promotion: ${params.promotion}` : ""}
+${params.brandKitContext ?? ""}
 
 COPY TO REVIEW:
 ${copyJson}
