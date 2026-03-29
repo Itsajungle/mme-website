@@ -12,8 +12,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const canva = getCanvaService();
-  const connected = await canva.isConnected(brandId);
-
-  return NextResponse.json({ connected });
+  try {
+    const canva = getCanvaService();
+    const connected = await canva.isConnected(brandId);
+    return NextResponse.json({ connected });
+  } catch {
+    // If Supabase is unreachable or table doesn't exist yet, treat as not connected
+    return NextResponse.json({ connected: false });
+  }
 }
