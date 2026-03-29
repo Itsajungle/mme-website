@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Palette,
@@ -38,6 +38,7 @@ import { ContentPreview } from "./ContentPreview";
 import { PipelineStatus } from "./PipelineStatus";
 import { SocialBrandKit } from "./SocialBrandKit";
 import { ContentResultCards } from "./ContentResultCards";
+import { CanvaConnect } from "./CanvaConnect";
 
 interface SocialStudioAppProps {
   brand: Brand;
@@ -252,6 +253,30 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
 
   // Errors
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Canva connection
+  const [canvaConnected, setCanvaConnected] = useState(false);
+
+  const checkCanvaStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/canva/status?brand_id=${encodeURIComponent(brand.slug)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCanvaConnected(data.connected);
+      }
+    } catch { /* ignore */ }
+  }, [brand.slug]);
+
+  useEffect(() => {
+    checkCanvaStatus();
+    // Check if redirected back from Canva OAuth
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("canva") === "connected") {
+        setCanvaConnected(true);
+      }
+    }
+  }, [checkCanvaStatus]);
 
   // ── Helpers ──────────────────────────────────────────────────────────
   const togglePlatform = (id: string) => {
@@ -763,6 +788,18 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                     )}
                   </AnimatePresence>
 
+                  {/* Canva connection */}
+                  <CanvaConnect
+                    brandSlug={brand.slug}
+                    connected={canvaConnected}
+                    onDisconnect={async () => {
+                      try {
+                        await fetch(`/api/canva/status?brand_id=${encodeURIComponent(brand.slug)}`);
+                        setCanvaConnected(false);
+                      } catch { /* ignore */ }
+                    }}
+                  />
+
                   {/* Generated content cards */}
                   {generatedContent && generatedContent.length > 0 ? (
                     <ContentResultCards
@@ -770,6 +807,8 @@ export function SocialStudioApp({ brand }: SocialStudioAppProps) {
                       onEdit={handleEditContent}
                       onPublish={handlePublishPlatform}
                       isPublishing={publishingPlatforms}
+                      canvaConnected={canvaConnected}
+                      brandSlug={brand.slug}
                     />
                   ) : selectedPlatforms.length > 0 ? (
                     <div className="flex items-center justify-center h-32 rounded-xl border border-dashed border-border text-text-muted text-sm">
