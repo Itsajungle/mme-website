@@ -63,6 +63,12 @@ export interface VideoGenerationRequest {
   voiceId?: string;
   format: "9:16" | "16:9" | "1:1";
   imagePrompt?: string;
+  slides?: Array<{
+    heading: string;
+    narration: string;
+    imageUrl?: string;
+    duration: number;
+  }>;
 }
 
 export interface GeneratedVideo {
