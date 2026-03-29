@@ -8,36 +8,48 @@ interface FlowConnectorProps {
   direction?: "horizontal" | "vertical";
 }
 
-export function FlowConnector({ fromColor, toColor, direction = "horizontal" }: FlowConnectorProps) {
+export function FlowConnector({
+  fromColor,
+  toColor,
+  direction = "horizontal",
+}: FlowConnectorProps) {
+  const gradId = `grad-${fromColor.replace("#", "")}-${toColor.replace("#", "")}`;
   const isHorizontal = direction === "horizontal";
 
   if (isHorizontal) {
     return (
-      <div className="flex items-center justify-center w-12 lg:w-16 shrink-0">
-        <svg width="100%" height="40" viewBox="0 0 64 40" fill="none" className="overflow-visible">
+      <div className="flex items-center justify-center w-10 lg:w-14 shrink-0">
+        <svg
+          width="100%"
+          height="40"
+          viewBox="0 0 56 40"
+          fill="none"
+          className="overflow-visible"
+        >
           <defs>
-            <linearGradient id={`grad-${fromColor}-${toColor}`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={fromColor} stopOpacity="0.4" />
-              <stop offset="100%" stopColor={toColor} stopOpacity="0.4" />
+            <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={fromColor} stopOpacity="0.5" />
+              <stop offset="100%" stopColor={toColor} stopOpacity="0.5" />
             </linearGradient>
           </defs>
-          {/* Line */}
           <line
-            x1="0" y1="20" x2="64" y2="20"
-            stroke={`url(#grad-${fromColor}-${toColor})`}
+            x1="0"
+            y1="20"
+            x2="56"
+            y2="20"
+            stroke={`url(#${gradId})`}
             strokeWidth="2"
           />
-          {/* Arrow head */}
           <path
-            d="M56 14 L64 20 L56 26"
+            d="M48 14 L56 20 L48 26"
             stroke={toColor}
-            strokeOpacity="0.5"
+            strokeOpacity="0.6"
             strokeWidth="2"
             fill="none"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          {/* Flowing dot */}
+          {/* Flowing dot 1 */}
           <motion.circle
             cx="0"
             cy="20"
@@ -45,18 +57,30 @@ export function FlowConnector({ fromColor, toColor, direction = "horizontal" }: 
             fill="white"
             opacity="0.9"
             filter="drop-shadow(0 0 4px white)"
-            animate={{ cx: [0, 64] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.5 }}
+            animate={{ cx: [0, 56] }}
+            transition={{
+              duration: 1.6,
+              repeat: Infinity,
+              ease: "easeInOut",
+              repeatDelay: 0.4,
+            }}
           />
+          {/* Flowing dot 2 */}
           <motion.circle
             cx="0"
             cy="20"
-            r="3"
+            r="2.5"
             fill="white"
             opacity="0.5"
-            filter="drop-shadow(0 0 4px white)"
-            animate={{ cx: [0, 64] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.5, delay: 1.1 }}
+            filter="drop-shadow(0 0 3px white)"
+            animate={{ cx: [0, 56] }}
+            transition={{
+              duration: 1.6,
+              repeat: Infinity,
+              ease: "easeInOut",
+              repeatDelay: 0.4,
+              delay: 0.9,
+            }}
           />
         </svg>
       </div>
@@ -64,24 +88,34 @@ export function FlowConnector({ fromColor, toColor, direction = "horizontal" }: 
   }
 
   // Vertical connector for mobile
+  const vGradId = `v${gradId}`;
   return (
-    <div className="flex justify-center h-10 shrink-0">
-      <svg width="40" height="100%" viewBox="0 0 40 40" fill="none" className="overflow-visible">
+    <div className="flex justify-center h-8 shrink-0">
+      <svg
+        width="40"
+        height="100%"
+        viewBox="0 0 40 32"
+        fill="none"
+        className="overflow-visible"
+      >
         <defs>
-          <linearGradient id={`vgrad-${fromColor}-${toColor}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={fromColor} stopOpacity="0.4" />
-            <stop offset="100%" stopColor={toColor} stopOpacity="0.4" />
+          <linearGradient id={vGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={fromColor} stopOpacity="0.5" />
+            <stop offset="100%" stopColor={toColor} stopOpacity="0.5" />
           </linearGradient>
         </defs>
         <line
-          x1="20" y1="0" x2="20" y2="40"
-          stroke={`url(#vgrad-${fromColor}-${toColor})`}
+          x1="20"
+          y1="0"
+          x2="20"
+          y2="32"
+          stroke={`url(#${vGradId})`}
           strokeWidth="2"
         />
         <path
-          d="M14 32 L20 40 L26 32"
+          d="M14 24 L20 32 L26 24"
           stroke={toColor}
-          strokeOpacity="0.5"
+          strokeOpacity="0.6"
           strokeWidth="2"
           fill="none"
           strokeLinecap="round"
@@ -94,8 +128,13 @@ export function FlowConnector({ fromColor, toColor, direction = "horizontal" }: 
           fill="white"
           opacity="0.9"
           filter="drop-shadow(0 0 4px white)"
-          animate={{ cy: [0, 40] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.5 }}
+          animate={{ cy: [0, 32] }}
+          transition={{
+            duration: 1.6,
+            repeat: Infinity,
+            ease: "easeInOut",
+            repeatDelay: 0.4,
+          }}
         />
       </svg>
     </div>

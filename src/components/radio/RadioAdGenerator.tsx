@@ -958,6 +958,7 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
                 onChange={setScriptText}
                 duration={duration}
                 brandName={brand.name}
+                triggerType={triggerType}
               />
               <div className="flex gap-3">
                 <button
@@ -1004,6 +1005,7 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
             brandName={brand.name}
             hasMusic={true}
             hasSFX={true}
+            onScriptChange={setScriptText}
           />
 
           {/* Generate Audio Button (Hybrid, after script approval) */}

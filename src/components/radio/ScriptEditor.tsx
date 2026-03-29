@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
   Clock,
   Type,
   Hash,
   Sparkles,
+  X,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,17 +20,31 @@ const WORDS_PER_SECOND: Record<string, number> = {
   "60s": 2.5,
 };
 
+interface Suggestion {
+  id: string;
+  category: string;
+  text: string;
+  replacement?: string;
+}
+
 export function ScriptEditor({
   script,
   onChange,
   duration,
   brandName,
+  triggerType,
 }: {
   script: string;
   onChange: (script: string) => void;
   duration: string;
   brandName: string;
+  triggerType?: string;
 }) {
+  const [showPanel, setShowPanel] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+
   const stats = useMemo(() => {
     const trimmed = script.trim();
     const chars = trimmed.length;
@@ -42,8 +59,55 @@ export function ScriptEditor({
     return { chars, words, targetWords, estimatedSeconds, withinTarget };
   }, [script, duration]);
 
+  const fetchSuggestions = useCallback(async () => {
+    setLoading(true);
+    setShowPanel(true);
+    setAppliedIds(new Set());
+    try {
+      const res = await fetch("/api/radio/suggest-improvements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script, brandName, duration, triggerType }),
+      });
+      const data = await res.json();
+      setSuggestions(data.suggestions ?? []);
+    } catch {
+      setSuggestions([
+        { id: "err", category: "Error", text: "Could not load suggestions" },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [script, brandName, duration, triggerType]);
+
+  const applySuggestion = useCallback(
+    async (suggestion: Suggestion) => {
+      if (!suggestion.replacement) return;
+      try {
+        const res = await fetch("/api/radio/apply-improvement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            script,
+            suggestionId: suggestion.id,
+            replacement: suggestion.replacement,
+            brandName,
+          }),
+        });
+        const data = await res.json();
+        if (data.revisedScript) {
+          onChange(data.revisedScript);
+          setAppliedIds((prev) => new Set(prev).add(suggestion.id));
+        }
+      } catch {
+        // Silently fail
+      }
+    },
+    [script, brandName, onChange]
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -131,11 +195,88 @@ export function ScriptEditor({
         </div>
       )}
 
-      {/* Suggest Improvements */}
-      <button className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm text-text-secondary hover:border-border-hover hover:text-text transition-colors w-full justify-center">
-        <Sparkles size={16} className="text-accent" />
+      {/* Suggest Improvements Button */}
+      <button
+        onClick={fetchSuggestions}
+        disabled={loading}
+        className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm text-text-secondary hover:border-accent/40 hover:text-text transition-colors w-full justify-center disabled:opacity-50"
+      >
+        {loading ? (
+          <Loader2 size={16} className="text-accent animate-spin" />
+        ) : (
+          <Sparkles size={16} className="text-accent" />
+        )}
         Suggest Improvements
       </button>
+
+      {/* Slide-out Suggestions Panel */}
+      <AnimatePresence>
+        {showPanel && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="absolute right-0 top-0 w-80 bg-bg-card border border-border rounded-xl p-4 shadow-xl z-10"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-accent" />
+                <h4 className="text-sm font-semibold text-text">
+                  Suggestions
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowPanel(false)}
+                className="text-text-muted hover:text-text transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={20} className="text-accent animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {suggestions.map((s) => (
+                  <div
+                    key={s.id}
+                    className="rounded-lg border border-border bg-bg-deep p-3"
+                  >
+                    <span className="text-[10px] uppercase tracking-wider font-medium text-amber-400">
+                      {s.category}
+                    </span>
+                    <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+                      {s.text}
+                    </p>
+                    {s.replacement && (
+                      <button
+                        onClick={() => applySuggestion(s)}
+                        disabled={appliedIds.has(s.id)}
+                        className={cn(
+                          "mt-2 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                          appliedIds.has(s.id)
+                            ? "bg-green-500/10 text-green-400"
+                            : "bg-accent/10 text-accent hover:bg-accent/20"
+                        )}
+                      >
+                        {appliedIds.has(s.id) ? (
+                          <>
+                            <Check size={10} /> Applied
+                          </>
+                        ) : (
+                          "Apply"
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
