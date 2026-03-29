@@ -103,14 +103,15 @@ export function ContentResultCards({
       const res = await fetch("/api/canva/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand_id: brandSlug, title }),
+        body: JSON.stringify({ brand_id: brandSlug, title, design_type: `custom_${platform}` }),
       });
       if (!res.ok) throw new Error("Failed to create design");
       const data = await res.json();
       setCanvaDesignIds((prev) => ({ ...prev, [platform]: data.design_id }));
       window.open(data.edit_url, "_blank");
       setCanvaState(platform, "canva_editing");
-    } catch {
+    } catch (err) {
+      console.error("Canva design creation failed:", err);
       setCanvaState(platform, "idle");
     }
   };

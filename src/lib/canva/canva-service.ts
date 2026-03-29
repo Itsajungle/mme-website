@@ -280,8 +280,20 @@ export class CanvaService {
     title: string,
     designType = "doc",
   ): Promise<{ designId: string; editUrl: string; viewUrl: string }> {
+    const CUSTOM_SIZES: Record<string, { width: number; height: number }> = {
+      custom_instagram: { width: 1080, height: 1080 },
+      custom_facebook: { width: 1200, height: 630 },
+      custom_linkedin: { width: 1200, height: 627 },
+      custom_tiktok: { width: 1080, height: 1920 },
+      custom_x: { width: 1200, height: 675 },
+    };
+
+    const designTypeObj = designType.startsWith("custom_")
+      ? { type: "custom", ...CUSTOM_SIZES[designType] }
+      : { type: "preset", name: designType };
+
     const result = (await this.apiRequest(brandId, "POST", "/designs", {
-      design_type: designType,
+      design_type: designTypeObj,
       title,
     })) as {
       design: { id: string; urls: { edit_url: string; view_url: string } };
