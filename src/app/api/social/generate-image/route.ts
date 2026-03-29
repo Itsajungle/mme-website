@@ -14,14 +14,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Resolve brand for sector/tone context
+    // Resolve brand for visual context only — never inject audio/voice
+    // descriptions into image prompts as they confuse the image model
     let brand = getBrandBySlug("sunshine-radio", brandSlug);
     if (!brand) {
       brand = DEMO_BRANDS.find((b) => b.slug === brandSlug);
     }
 
+    // Only use sector name for visual style hints — keep prompt clean
     const enrichedPrompt = brand
-      ? `${prompt} — style: ${brand.sectorName} brand, tone: ${brand.audioBrandKit.voiceDescription}`
+      ? `${prompt} — professional ${brand.sectorName.toLowerCase()} sector photography style`
       : prompt;
 
     const result = await generateImage({
@@ -29,6 +31,7 @@ export async function POST(request: Request) {
       platform,
       brandSlug,
       aspectRatio,
+      brandSector: brand?.sectorName,
     });
 
     return Response.json(result);
