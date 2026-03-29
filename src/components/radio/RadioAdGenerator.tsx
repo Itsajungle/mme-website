@@ -105,6 +105,9 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [musicUrl, setMusicUrl] = useState("");
   const [sfxUrls, setSfxUrls] = useState<string[]>([]);
+  const [stemVoiceUrl, setStemVoiceUrl] = useState("");
+  const [stemVoiceDuration, setStemVoiceDuration] = useState(0);
+  const [regenerating, setRegenerating] = useState<"voice" | "music" | "sfx" | "remix" | null>(null);
   const [generationError, setGenerationError] = useState("");
 
   // Music & SFX selection (hybrid mode)
@@ -226,6 +229,8 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
         voiceUrl = voiceResult.url;
         voiceDuration = voiceResult.duration;
         setAudioUrl(voiceUrl);
+        setStemVoiceUrl(voiceUrl);
+        setStemVoiceDuration(voiceDuration);
       } catch (err) {
         console.error('[RadioAdGenerator] Voice gen error:', err);
         console.error('[RadioAdGenerator] Error type:', typeof err, 'isError:', err instanceof Error);
@@ -258,25 +263,33 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
         // Music generation failed — continue without music
       }
 
-      // Step 3: SFX generation (non-blocking — continue without if it fails)
+      // Step 3: SFX generation — generate ALL selected SFX in parallel
       setPipelineStep("sfx");
-      let generatedSfxUrl = "";
-      try {
-        const sfxRes = await fetch("/api/audio/sfx-generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: `${selectedSfx[0] || brand.sectorName} sound effect for radio ad`,
-            durationSeconds: 3,
-          }),
+      const sfxToGenerate = selectedSfx.length > 0 ? selectedSfx : [];
+      const generatedSfxList: Array<{ name: string; url: string }> = [];
+      if (sfxToGenerate.length > 0) {
+        const sfxPromises = sfxToGenerate.map(async (sfxName) => {
+          try {
+            const sfxRes = await fetch("/api/audio/sfx-generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: `${sfxName} sound effect for radio ad`,
+                durationSeconds: 3,
+              }),
+            });
+            const sfxData = await sfxRes.json();
+            if (sfxRes.ok && sfxData.url) {
+              return { name: sfxName, url: sfxData.url };
+            }
+          } catch {
+            // Individual SFX failed — skip it
+          }
+          return null;
         });
-        const sfxData = await sfxRes.json();
-        if (sfxRes.ok && sfxData.url) {
-          generatedSfxUrl = sfxData.url;
-          setSfxUrls([sfxData.url]);
-        }
-      } catch {
-        // SFX generation failed — continue without SFX
+        const results = await Promise.all(sfxPromises);
+        results.forEach(r => { if (r) generatedSfxList.push(r); });
+        setSfxUrls(generatedSfxList.map(s => s.url));
       }
 
       // Step 4: Mix all tracks together
@@ -310,15 +323,18 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
           });
         }
 
-        if (generatedSfxUrl) {
+        // Add all generated SFX to the mix, spaced across the ad
+        const sfxSpacing = generatedSfxList.length > 1 ? (durationSeconds - 4) / (generatedSfxList.length - 1) : 0;
+        generatedSfxList.forEach((sfx, idx) => {
+          const startPos = generatedSfxList.length === 1 ? 0.5 : 0.5 + (idx * sfxSpacing);
           segments.push({
-            audioUrl: generatedSfxUrl,
-            startTime: 0.5,
+            audioUrl: sfx.url,
+            startTime: startPos,
             duration: 3,
             volume: 50,
             track: "sfx",
           });
-        }
+        });
 
         const mixResult = await engine.mixAudio({
           segments,
@@ -338,9 +354,169 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
 
       setAudioGenerated(true);
       setPipelineStep("complete");
+
+      // Send stems to Production Timeline
+      if (onAudioGenerated) {
+        const timelineSegs: TimelineSegment[] = [{
+          id: "voice-1", label: "Voice", start: 2,
+          end: 2 + voiceDuration, volume: 100, track: "voice",
+          audioUrl: voiceUrl,
+        }];
+        if (generatedMusicUrl) {
+          timelineSegs.push({
+            id: "music-1", label: "Music Bed", start: 0,
+            end: durationSeconds, volume: 40, track: "music",
+            audioUrl: generatedMusicUrl,
+            ducking: { underVoice: true, duckLevel: 50, fadeMs: 500 },
+          });
+        }
+        // Add all SFX to timeline, spaced across the ad
+        generatedSfxList.forEach((sfx, idx) => {
+          const startPos = generatedSfxList.length === 1 ? 0.5 : 0.5 + (idx * ((durationSeconds - 4) / Math.max(1, generatedSfxList.length - 1)));
+          timelineSegs.push({
+            id: `sfx-${idx + 1}`, label: sfx.name, start: startPos,
+            end: startPos + 3, volume: 50, track: "sfx",
+            audioUrl: sfx.url,
+          });
+        });
+        onAudioGenerated(timelineSegs, duration);
+      }
     },
-    [scriptText, selectedVoiceId, engine, durationSeconds, brand, tone, triggerType]
+    [scriptText, selectedVoiceId, engine, durationSeconds, brand, tone, triggerType, duration, onAudioGenerated, selectedSfx]
   );
+
+  // Remix with current stems
+  const handleRemix = useCallback(async (
+    vUrl?: string, vDur?: number, mUrl?: string, sUrl?: string
+  ) => {
+    const useVoiceUrl = vUrl || stemVoiceUrl;
+    const useVoiceDur = vDur || stemVoiceDuration;
+    const useMusicUrl = mUrl !== undefined ? mUrl : musicUrl;
+    const useSfxUrl = sUrl !== undefined ? sUrl : (sfxUrls[0] || "");
+    if (!useVoiceUrl) return;
+
+    setRegenerating("remix");
+    try {
+      const segments: Array<{
+        audioUrl: string; startTime: number; duration: number;
+        volume: number; track: "voice" | "music" | "sfx";
+        ducking?: { underVoice: boolean; duckLevel: number; fadeMs: number };
+      }> = [{
+        audioUrl: useVoiceUrl, startTime: 2,
+        duration: useVoiceDur, volume: 100, track: "voice",
+      }];
+      if (useMusicUrl) {
+        segments.push({
+          audioUrl: useMusicUrl, startTime: 0,
+          duration: durationSeconds + 4, volume: 40, track: "music",
+          ducking: { underVoice: true, duckLevel: 50, fadeMs: 500 },
+        });
+      }
+      if (useSfxUrl) {
+        segments.push({
+          audioUrl: useSfxUrl, startTime: 0.5,
+          duration: 3, volume: 50, track: "sfx",
+        });
+      }
+      const mixResult = await engine.mixAudio({
+        segments, totalDuration: durationSeconds,
+        loudnessTarget: -23, outputFormat: "mp3",
+      });
+      if (mixResult.mp3Url) setAudioUrl(mixResult.mp3Url);
+
+      // Send stems to timeline
+      if (onAudioGenerated) {
+        const timelineSegs: TimelineSegment[] = [{
+          id: "voice-1", label: "Voice", start: 2,
+          end: 2 + useVoiceDur, volume: 100, track: "voice",
+          audioUrl: useVoiceUrl,
+        }];
+        if (useMusicUrl) {
+          timelineSegs.push({
+            id: "music-1", label: "Music Bed", start: 0,
+            end: durationSeconds, volume: 40, track: "music",
+            audioUrl: useMusicUrl,
+            ducking: { underVoice: true, duckLevel: 50, fadeMs: 500 },
+          });
+        }
+        if (useSfxUrl) {
+          timelineSegs.push({
+            id: "sfx-1", label: "SFX", start: 0.5,
+            end: 3.5, volume: 50, track: "sfx",
+            audioUrl: useSfxUrl,
+          });
+        }
+        onAudioGenerated(timelineSegs, duration);
+      }
+    } catch (err) {
+      setGenerationError(err instanceof Error ? err.message : "Remix failed");
+    }
+    setRegenerating(null);
+  }, [stemVoiceUrl, stemVoiceDuration, musicUrl, sfxUrls, durationSeconds, engine, duration, onAudioGenerated]);
+
+  // Regenerate just the voice
+  const handleRegenerateVoice = useCallback(async () => {
+    const voiceOnlyText = scriptText
+      .replace(/\[.*?\]/g, "").replace(/VOICE.*?:\n/g, "")
+      .replace(/"/g, "").replace(/\n{2,}/g, " ").trim();
+    if (!voiceOnlyText) return;
+    setRegenerating("voice");
+    try {
+      const result = await engine.generateSpeech(voiceOnlyText, selectedVoiceId);
+      setStemVoiceUrl(result.url);
+      setStemVoiceDuration(result.duration);
+      await handleRemix(result.url, result.duration);
+    } catch (err) {
+      setGenerationError(err instanceof Error ? err.message : "Voice regeneration failed");
+    }
+    setRegenerating(null);
+  }, [scriptText, selectedVoiceId, engine, handleRemix]);
+
+  // Regenerate just the music
+  const handleRegenerateMusic = useCallback(async () => {
+    setRegenerating("music");
+    try {
+      const res = await fetch("/api/audio/music-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `Instrumental background music bed, no vocals, no singing, ${musicMood} mood, for a ${tone} ${brand.sectorName} radio ad, ${durationSeconds} seconds, gentle underscore`,
+          durationSeconds: durationSeconds + 4,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setMusicUrl(data.url);
+        await handleRemix(undefined, undefined, data.url);
+      }
+    } catch (err) {
+      setGenerationError(err instanceof Error ? err.message : "Music regeneration failed");
+    }
+    setRegenerating(null);
+  }, [musicMood, tone, brand.sectorName, durationSeconds, handleRemix]);
+
+  // Regenerate just the SFX
+  const handleRegenerateSfx = useCallback(async () => {
+    setRegenerating("sfx");
+    try {
+      const res = await fetch("/api/audio/sfx-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `${selectedSfx[0] || brand.sectorName} sound effect for radio ad`,
+          durationSeconds: 3,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setSfxUrls([data.url]);
+        await handleRemix(undefined, undefined, undefined, data.url);
+      }
+    } catch (err) {
+      setGenerationError(err instanceof Error ? err.message : "SFX regeneration failed");
+    }
+    setRegenerating(null);
+  }, [selectedSfx, brand.sectorName, handleRemix]);
 
   return (
     <div className="space-y-6">
@@ -848,6 +1024,116 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
             isGenerated={audioGenerated}
             audioUrl={audioUrl}
           />
+
+          {/* Individual Element Controls — shown after generation */}
+          {audioGenerated && pipelineStep === "complete" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl border border-border bg-bg-card p-5 space-y-4"
+            >
+              <h3 className="font-heading text-sm font-bold text-text">
+                Adjust Elements
+                <span className="ml-2 text-xs font-normal text-text-muted">
+                  Change any element and regenerate individually
+                </span>
+              </h3>
+
+              {/* Voice */}
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-deep px-4 py-3">
+                <Mic size={14} className="text-accent shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium text-text">Voice</span>
+                  <span className="ml-2 text-xs text-text-muted">
+                    {VOICE_ROSTER.find(v => v.id === selectedVoiceId)?.name}
+                  </span>
+                </div>
+                <select
+                  value={selectedVoiceId}
+                  onChange={(e) => setSelectedVoiceId(e.target.value)}
+                  className="rounded-md border border-border bg-bg-card px-2 py-1 text-xs text-text"
+                >
+                  <optgroup label="Female">
+                    {VOICE_ROSTER.filter(v => v.gender === "female").map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Male">
+                    {VOICE_ROSTER.filter(v => v.gender === "male").map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button
+                  onClick={handleRegenerateVoice}
+                  disabled={regenerating !== null}
+                  className={cn(
+                    "rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent hover:bg-accent/20 transition-colors",
+                    regenerating !== null && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {regenerating === "voice" ? "Generating..." : "Regen Voice"}
+                </button>
+              </div>
+
+              {/* Music */}
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-deep px-4 py-3">
+                <Music size={14} className="text-blue-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium text-text">Music</span>
+                  <span className="ml-2 text-xs text-text-muted">{musicMood} mood</span>
+                </div>
+                <select
+                  value={musicMood}
+                  onChange={(e) => setMusicMood(e.target.value)}
+                  className="rounded-md border border-border bg-bg-card px-2 py-1 text-xs text-text"
+                >
+                  {MUSIC_MOODS.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleRegenerateMusic}
+                  disabled={regenerating !== null}
+                  className={cn(
+                    "rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-400 hover:bg-blue-500/20 transition-colors",
+                    regenerating !== null && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {regenerating === "music" ? "Generating..." : "Regen Music"}
+                </button>
+              </div>
+
+              {/* SFX */}
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-deep px-4 py-3">
+                <Volume2 size={14} className="text-amber-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium text-text">SFX</span>
+                  <span className="ml-2 text-xs text-text-muted">
+                    {selectedSfx[0] || brand.sectorName}
+                  </span>
+                </div>
+                <button
+                  onClick={handleRegenerateSfx}
+                  disabled={regenerating !== null}
+                  className={cn(
+                    "rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition-colors",
+                    regenerating !== null && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {regenerating === "sfx" ? "Generating..." : "Regen SFX"}
+                </button>
+              </div>
+
+              {/* Remixing indicator */}
+              {regenerating === "remix" && (
+                <div className="flex items-center justify-center gap-2 py-2 text-xs text-text-muted">
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                  Remixing audio...
+                </div>
+              )}
+            </motion.div>
+          )}
 
           {/* Schedule button */}
           {pipelineStep === "complete" && (

@@ -21,6 +21,8 @@ export async function POST(request: Request) {
     const result = await generateSpeech(text, voiceId, settings);
     return Response.json(result);
   } catch (error) {
+    console.error("[voice-generate] FULL ERROR:", error);
+    console.error("[voice-generate] Error type:", typeof error, error instanceof Error ? error.message : String(error));
     return Response.json(
       { error: "Voice generation failed", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

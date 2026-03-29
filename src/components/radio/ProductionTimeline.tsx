@@ -143,6 +143,10 @@ export function ProductionTimeline({
   const playbackRef = useRef<number | null>(null);
   const playStartRef = useRef(0);
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const segmentsRef = useRef(segments);
+  const tracksRef = useRef(tracks);
+  segmentsRef.current = segments;
+  tracksRef.current = tracks;
 
   // Ruler ticks
   const tickInterval = totalSeconds <= 15 ? 1 : totalSeconds <= 30 ? 2 : 5;
@@ -190,11 +194,11 @@ export function ProductionTimeline({
 
         // Sync audio elements with playhead
         audioElementsRef.current.forEach((audio, segId) => {
-          const seg = segments.find(s => s.id === segId);
+          const seg = segmentsRef.current.find(s => s.id === segId);
           if (!seg) return;
-          const track = tracks.find(t => t.key === seg.track);
+          const track = tracksRef.current.find(t => t.key === seg.track);
           const isMuted = track?.muted || false;
-          const hasSolo = tracks.some(t => t.solo);
+          const hasSolo = tracksRef.current.some(t => t.solo);
           const shouldPlay = !isMuted && (!hasSolo || (track?.solo ?? false));
 
           if (elapsed >= seg.start && elapsed < seg.end && shouldPlay) {
@@ -202,7 +206,7 @@ export function ProductionTimeline({
             let vol = seg.volume / 100;
             if (seg.ducking?.underVoice) {
               // Check if any voice segment is active right now
-              const voiceActive = segments.some(
+              const voiceActive = segmentsRef.current.some(
                 vs => vs.track === "voice" && elapsed >= vs.start && elapsed < vs.end
               );
               if (voiceActive) {
