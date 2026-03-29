@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Trash2, ImageIcon, Type, Droplets } from "lucide-react";
+import { Upload, Trash2, ImageIcon, Type, Droplets, Save, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Brand } from "@/lib/demo-data";
 import type { SocialBrandKit as SocialBrandKitType, BrandAsset } from "@/lib/social-engine/brand-kit-types";
@@ -82,12 +82,14 @@ function UploadZone({
   assets,
   onUpload,
   onRemove,
+  uploading,
 }: {
   label: string;
   icon: typeof ImageIcon;
   assets: BrandAsset[];
   onUpload: (files: FileList) => void;
   onRemove: (id: string) => void;
+  uploading?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -115,6 +117,7 @@ function UploadZone({
         <span className="text-[10px] text-text-muted font-mono">
           ({assets.length})
         </span>
+        {uploading && <Loader2 size={12} className="animate-spin text-accent" />}
       </div>
 
       {/* Drop zone */}
@@ -196,8 +199,57 @@ function UploadZone({
 
 // ── Main Component ───────────────────────────────────────────────────────
 export function SocialBrandKit({ kit, onUpdate, brand }: SocialBrandKitProps) {
-  // Auto-populate for Riordan Motors
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
+
+  const brandId = brand.slug;
+  const stationId = brand.stationSlug;
+
+  // ── Load saved brand kit on mount ──
   useEffect(() => {
+    if (loadedOnce) return;
+    let cancelled = false;
+
+    async function loadKit() {
+      try {
+        const res = await fetch(
+          `/api/social/brand-kit?brand_id=${encodeURIComponent(brandId)}&station_id=${encodeURIComponent(stationId)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data.brand_kit) return;
+
+        const saved = data.brand_kit;
+        onUpdate({
+          ...kit,
+          brandSlug: brandId,
+          primaryColor: saved.primary_color || kit.primaryColor,
+          secondaryColor: saved.secondary_color || kit.secondaryColor,
+          accentColor: saved.accent_color || kit.accentColor,
+          backgroundColor: saved.background_color || kit.backgroundColor,
+          headlineFont: saved.headline_font || kit.headlineFont,
+          bodyFont: saved.body_font || kit.bodyFont,
+          toneOfVoice: saved.tone_of_voice || kit.toneOfVoice,
+          tagline: saved.tagline || kit.tagline,
+          logos: Array.isArray(saved.logos) ? saved.logos : kit.logos,
+          productImages: Array.isArray(saved.product_images) ? saved.product_images : kit.productImages,
+          heroImages: Array.isArray(saved.hero_images) ? saved.hero_images : kit.heroImages,
+        });
+      } catch {
+        // silently fall back to defaults / Riordan defaults
+      } finally {
+        if (!cancelled) setLoadedOnce(true);
+      }
+    }
+
+    loadKit();
+    return () => { cancelled = true; };
+  }, [brandId, stationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-populate for Riordan Motors only if nothing was loaded from DB
+  useEffect(() => {
+    if (!loadedOnce) return;
     if (brand.slug === "riordan-motors" && kit.brandSlug !== "riordan-motors") {
       onUpdate({
         ...kit,
@@ -207,62 +259,153 @@ export function SocialBrandKit({ kit, onUpdate, brand }: SocialBrandKitProps) {
     } else if (kit.brandSlug !== brand.slug) {
       onUpdate({ ...kit, brandSlug: brand.slug });
     }
-  }, [brand.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [brand.slug, loadedOnce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Save brand kit ──
+  const handleSave = async () => {
+    setSaveStatus("saving");
+    try {
+      const payload = {
+        brand_id: brandId,
+        station_id: stationId,
+        primary_color: kit.primaryColor,
+        secondary_color: kit.secondaryColor,
+        accent_color: kit.accentColor,
+        background_color: kit.backgroundColor,
+        headline_font: kit.headlineFont,
+        body_font: kit.bodyFont,
+        tone_of_voice: kit.toneOfVoice,
+        tagline: kit.tagline,
+        logos: kit.logos.map((a) => ({ id: a.id, url: a.url, name: a.name, type: a.type, width: a.width, height: a.height })),
+        product_images: kit.productImages.map((a) => ({ id: a.id, url: a.url, name: a.name, type: a.type, width: a.width, height: a.height })),
+        hero_images: kit.heroImages.map((a) => ({ id: a.id, url: a.url, name: a.name, type: a.type, width: a.width, height: a.height })),
+      };
+
+      const res = await fetch("/api/social/brand-kit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2500);
+    } catch {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  };
 
   const updateColor = (field: keyof SocialBrandKitType, value: string) => {
     onUpdate({ ...kit, [field]: value });
   };
 
+  // ── Upload file to Supabase Storage then add to kit state ──
+  const uploadAndAddAsset = useCallback(
+    async (
+      file: File,
+      assetType: "logo" | "product" | "hero",
+      field: "logos" | "productImages" | "heroImages",
+      currentKit: SocialBrandKitType
+    ): Promise<{ asset: BrandAsset; updatedField: BrandAsset[] } | null> => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const params = new URLSearchParams({
+        category: assetType,
+        brand_id: brandId,
+        station_id: stationId,
+      });
+
+      const res = await fetch(`/api/social/brand-kit/upload?${params}`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) return null;
+      const { url, name } = await res.json();
+
+      const asset: BrandAsset = {
+        id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: name || file.name,
+        type: assetType,
+        url,
+        fileSize: file.size,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      return { asset, updatedField: [...currentKit[field], asset] };
+    },
+    [brandId, stationId]
+  );
+
   const processFiles = useCallback(
-    (
+    async (
       files: FileList,
       assetType: "logo" | "product" | "hero",
       field: "logos" | "productImages" | "heroImages"
     ) => {
-      const newAssets: BrandAsset[] = [];
+      setUploadingCategory(assetType);
+      let currentKit = { ...kit };
 
-      Array.from(files).forEach((file) => {
-        if (!ACCEPTED_TYPES.includes(file.type)) return;
-        if (file.size > MAX_FILE_SIZE) return;
+      for (const file of Array.from(files)) {
+        if (!ACCEPTED_TYPES.includes(file.type)) continue;
+        if (file.size > MAX_FILE_SIZE) continue;
 
-        const url = URL.createObjectURL(file);
-        const asset: BrandAsset = {
-          id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          name: file.name,
-          type: assetType,
-          url,
-          fileSize: file.size,
-          uploadedAt: new Date().toISOString(),
-        };
-
-        // Read dimensions
-        const img = new Image();
-        img.onload = () => {
-          asset.width = img.naturalWidth;
-          asset.height = img.naturalHeight;
-          // Force re-render with dimensions
-          onUpdate({ ...kit, [field]: [...kit[field], ...newAssets] });
-        };
-        img.src = url;
-
-        newAssets.push(asset);
-      });
-
-      if (newAssets.length > 0) {
-        onUpdate({ ...kit, [field]: [...kit[field], ...newAssets] });
+        const result = await uploadAndAddAsset(file, assetType, field, currentKit);
+        if (result) {
+          currentKit = { ...currentKit, [field]: result.updatedField };
+          onUpdate(currentKit);
+        }
       }
+
+      setUploadingCategory(null);
     },
-    [kit, onUpdate]
+    [kit, onUpdate, uploadAndAddAsset]
   );
 
   const removeAsset = (field: "logos" | "productImages" | "heroImages", id: string) => {
-    const asset = kit[field].find((a) => a.id === id);
-    if (asset) URL.revokeObjectURL(asset.url);
     onUpdate({ ...kit, [field]: kit[field].filter((a) => a.id !== id) });
   };
 
   return (
     <div className="p-6 space-y-8">
+      {/* ── Save Button ── */}
+      <div className="flex items-center justify-between">
+        <div />
+        <button
+          onClick={handleSave}
+          disabled={saveStatus === "saving"}
+          className={cn(
+            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
+            saveStatus === "saved"
+              ? "bg-[#00FF96]/20 text-[#00FF96] border border-[#00FF96]/30"
+              : saveStatus === "error"
+                ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                : "bg-[#00FF96] text-[#040810] hover:bg-[#00FF96]/90 active:scale-[0.97]"
+          )}
+        >
+          {saveStatus === "saving" ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Saving…
+            </>
+          ) : saveStatus === "saved" ? (
+            <>
+              <CheckCircle2 size={16} />
+              Brand kit saved
+            </>
+          ) : saveStatus === "error" ? (
+            "Save failed — try again"
+          ) : (
+            <>
+              <Save size={16} />
+              Save Brand Kit
+            </>
+          )}
+        </button>
+      </div>
+
       {/* ── Brand Colours ── */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -362,6 +505,7 @@ export function SocialBrandKit({ kit, onUpdate, brand }: SocialBrandKitProps) {
           assets={kit.logos}
           onUpload={(files) => processFiles(files, "logo", "logos")}
           onRemove={(id) => removeAsset("logos", id)}
+          uploading={uploadingCategory === "logo"}
         />
 
         <UploadZone
@@ -370,6 +514,7 @@ export function SocialBrandKit({ kit, onUpdate, brand }: SocialBrandKitProps) {
           assets={kit.productImages}
           onUpload={(files) => processFiles(files, "product", "productImages")}
           onRemove={(id) => removeAsset("productImages", id)}
+          uploading={uploadingCategory === "product"}
         />
 
         <UploadZone
@@ -378,6 +523,7 @@ export function SocialBrandKit({ kit, onUpdate, brand }: SocialBrandKitProps) {
           assets={kit.heroImages}
           onUpload={(files) => processFiles(files, "hero", "heroImages")}
           onRemove={(id) => removeAsset("heroImages", id)}
+          uploading={uploadingCategory === "hero"}
         />
       </motion.div>
 
@@ -413,6 +559,41 @@ export function SocialBrandKit({ kit, onUpdate, brand }: SocialBrandKitProps) {
           />
         </div>
       </motion.div>
+
+      {/* ── Bottom Save Button ── */}
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={handleSave}
+          disabled={saveStatus === "saving"}
+          className={cn(
+            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
+            saveStatus === "saved"
+              ? "bg-[#00FF96]/20 text-[#00FF96] border border-[#00FF96]/30"
+              : saveStatus === "error"
+                ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                : "bg-[#00FF96] text-[#040810] hover:bg-[#00FF96]/90 active:scale-[0.97]"
+          )}
+        >
+          {saveStatus === "saving" ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Saving…
+            </>
+          ) : saveStatus === "saved" ? (
+            <>
+              <CheckCircle2 size={16} />
+              Brand kit saved
+            </>
+          ) : saveStatus === "error" ? (
+            "Save failed — try again"
+          ) : (
+            <>
+              <Save size={16} />
+              Save Brand Kit
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
