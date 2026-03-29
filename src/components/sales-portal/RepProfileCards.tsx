@@ -1,10 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SALES_REPS, MOCK_CLIENTS } from "@/lib/sales-portal/demo-data";
 import { Phone, Monitor, Trophy, TrendingUp } from "lucide-react";
+import { RepPitchView } from "./RepPitchView";
 
 export function RepProfileCards() {
+  const [pitchRepId, setPitchRepId] = useState<string | null>(null);
+
   return (
     <div className="space-y-4">
       <div>
@@ -16,13 +21,13 @@ export function RepProfileCards() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {SALES_REPS.map((rep) => {
-          const repClients = MOCK_CLIENTS.filter((c) => c.assignedRep === rep.id);
           const pct = Math.round((rep.stats.achieved / rep.stats.target) * 100);
 
           return (
             <div
               key={rep.id}
-              className="rounded-xl border border-border bg-bg-card overflow-hidden transition-all hover:border-border-hover"
+              onClick={() => setPitchRepId(rep.id)}
+              className="rounded-xl border border-border bg-bg-card overflow-hidden transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 cursor-pointer group"
             >
               {/* Header */}
               <div className="px-5 py-4 border-b border-border flex items-center gap-4">
@@ -30,7 +35,7 @@ export function RepProfileCards() {
                   {rep.initials}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-heading text-sm font-bold text-text">{rep.name}</h3>
+                  <h3 className="font-heading text-sm font-bold text-text group-hover:text-accent transition-colors">{rep.name}</h3>
                   <p className="text-[11px] text-text-muted">{rep.role}</p>
                   <p className="text-[10px] text-text-muted">{rep.sectorFocus}</p>
                 </div>
@@ -105,6 +110,13 @@ export function RepProfileCards() {
           );
         })}
       </div>
+
+      {/* Pitch View Modal */}
+      <AnimatePresence>
+        {pitchRepId && (
+          <RepPitchView repId={pitchRepId} onClose={() => setPitchRepId(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
