@@ -299,11 +299,16 @@ export class CanvaService {
       design: { id: string; urls: { edit_url: string; view_url: string } };
     };
 
-    return {
-      designId: result.design.id,
-      editUrl: result.design.urls.edit_url,
-      viewUrl: result.design.urls.view_url,
-    };
+    const designId = result.design.id;
+    let editUrl = result.design.urls?.edit_url ?? "";
+    const viewUrl = result.design.urls?.view_url ?? "";
+
+    // Fallback: if edit_url is missing or doesn't reference this design, construct it
+    if (!editUrl || !editUrl.includes(designId)) {
+      editUrl = `https://www.canva.com/design/${designId}/edit`;
+    }
+
+    return { designId, editUrl, viewUrl };
   }
 
   async exportDesign(

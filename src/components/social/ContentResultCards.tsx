@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Palette,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +74,8 @@ export function ContentResultCards({
   const [canvaDesignIds, setCanvaDesignIds] = useState<Record<string, string>>({});
   const [canvaExportIds, setCanvaExportIds] = useState<Record<string, string>>({});
   const [canvaImageUrls, setCanvaImageUrls] = useState<Record<string, string>>({});
+  const [canvaEditUrls, setCanvaEditUrls] = useState<Record<string, string>>({});
+  const [popupBlocked, setPopupBlocked] = useState<Record<string, boolean>>({});
 
   const startEdit = (platform: string, item: ContentItem) => {
     setEditingCard(platform);
@@ -108,7 +111,11 @@ export function ContentResultCards({
       if (!res.ok) throw new Error("Failed to create design");
       const data = await res.json();
       setCanvaDesignIds((prev) => ({ ...prev, [platform]: data.design_id }));
-      window.open(data.edit_url, "_blank");
+      setCanvaEditUrls((prev) => ({ ...prev, [platform]: data.edit_url }));
+      const win = window.open(data.edit_url, "_blank");
+      if (!win) {
+        setPopupBlocked((prev) => ({ ...prev, [platform]: true }));
+      }
       setCanvaState(platform, "canva_editing");
     } catch (err) {
       console.error("Canva design creation failed:", err);
@@ -373,8 +380,32 @@ export function ContentResultCards({
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
                         </span>
-                        Waiting for edits in Canva…
+                        <span className="flex-1">Waiting for edits in Canva…</span>
+                        {canvaEditUrls[item.platform] && (
+                          <a
+                            href={canvaEditUrls[item.platform]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 underline underline-offset-2 transition-colors"
+                          >
+                            Open in Canva
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
                       </div>
+                      {popupBlocked[item.platform] && canvaEditUrls[item.platform] && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                          Popup blocked —{" "}
+                          <a
+                            href={canvaEditUrls[item.platform]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline underline-offset-2 hover:text-red-300 transition-colors"
+                          >
+                            click here to open your design
+                          </a>
+                        </div>
+                      )}
                       <button
                         onClick={() => handleExportFromCanva(item.platform)}
                         className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
