@@ -139,14 +139,15 @@ export default function RadioTabPage({
                 <RadioAdGenerator brand={brand} mode={mode} onAudioGenerated={(segs, dur) => { setGeneratedSegments(segs); setGeneratedDuration(dur); }} />
               </div>
 
-              {/* Production Timeline */}
-              <div className="rounded-xl border border-border bg-bg-card p-6">
-                <ProductionTimeline
-                  duration={generatedDuration}
-                  segments={generatedSegments}
-                  readOnly={mode === "automated"}
-                />
-              </div>
+              {/* Production Timeline — Hybrid mode only */}
+              {mode === "hybrid" && (
+                <div className="rounded-xl border border-border bg-bg-card p-6">
+                  <ProductionTimeline
+                    duration={generatedDuration}
+                    segments={generatedSegments}
+                  />
+                </div>
+              )}
             </div>
           )}
 
