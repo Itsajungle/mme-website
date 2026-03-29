@@ -16,21 +16,23 @@ function supabaseUrl(path: string) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const brandSlug = searchParams.get("brand_slug");
+  const brandId = searchParams.get("brand_id");
+  const stationId = searchParams.get("station_id");
 
-  if (!brandSlug) {
+  if (!brandId) {
     return NextResponse.json(
-      { error: "brand_slug is required" },
+      { error: "brand_id is required" },
       { status: 400 },
     );
   }
 
-  const res = await fetch(
-    supabaseUrl(
-      `/social_brand_kits?brand_slug=eq.${encodeURIComponent(brandSlug)}&limit=1`,
-    ),
-    { headers: supabaseHeaders() },
-  );
+  let query = `/social_brand_kits?brand_id=eq.${encodeURIComponent(brandId)}`;
+  if (stationId) {
+    query += `&station_id=eq.${encodeURIComponent(stationId)}`;
+  }
+  query += "&limit=1";
+
+  const res = await fetch(supabaseUrl(query), { headers: supabaseHeaders() });
 
   const rows = await res.json();
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -42,32 +44,35 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { brand_slug, ...kitData } = body;
+  const { brand_id, station_id, ...kitData } = body;
 
-  if (!brand_slug) {
+  if (!brand_id) {
     return NextResponse.json(
-      { error: "brand_slug is required" },
+      { error: "brand_id is required" },
       { status: 400 },
     );
   }
 
-  const payload = {
-    brand_slug,
+  const payload: Record<string, unknown> = {
+    brand_id,
     ...kitData,
     updated_at: new Date().toISOString(),
   };
+  if (station_id) {
+    payload.station_id = station_id;
+  }
 
   // Try update first
-  const updateRes = await fetch(
-    supabaseUrl(
-      `/social_brand_kits?brand_slug=eq.${encodeURIComponent(brand_slug)}`,
-    ),
-    {
-      method: "PATCH",
-      headers: supabaseHeaders(),
-      body: JSON.stringify(payload),
-    },
-  );
+  let patchQuery = `/social_brand_kits?brand_id=eq.${encodeURIComponent(brand_id)}`;
+  if (station_id) {
+    patchQuery += `&station_id=eq.${encodeURIComponent(station_id)}`;
+  }
+
+  const updateRes = await fetch(supabaseUrl(patchQuery), {
+    method: "PATCH",
+    headers: supabaseHeaders(),
+    body: JSON.stringify(payload),
+  });
 
   const updated = await updateRes.json();
   if (Array.isArray(updated) && updated.length > 0) {
