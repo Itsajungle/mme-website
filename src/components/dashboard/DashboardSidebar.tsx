@@ -108,7 +108,7 @@ export function DashboardSidebar() {
                 )}
               >
                 <Zap size={18} />
-                Demo Ad Studio
+                Sales Portal
               </Link>
               <Link
                 href={`/dashboard/station/${stationSlug}/quality-engine`}
