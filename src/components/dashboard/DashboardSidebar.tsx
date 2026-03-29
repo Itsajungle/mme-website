@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Radio, Megaphone, Music, BarChart3, Settings, Menu, X, Workflow } from "lucide-react";
+import { LayoutDashboard, Radio, Megaphone, Music, BarChart3, Settings, Menu, X, Workflow, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -97,6 +97,19 @@ export function DashboardSidebar() {
               <p className="px-3 text-[10px] text-text-muted uppercase tracking-wider font-medium mb-2">
                 Station Tools
               </p>
+              <Link
+                href={`/dashboard/station/${stationSlug}/sales-portal`}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                  pathname.includes("/sales-portal")
+                    ? "bg-accent/10 text-accent"
+                    : "text-text-secondary hover:text-text hover:bg-white/5"
+                )}
+              >
+                <Zap size={18} />
+                Demo Ad Studio
+              </Link>
               <Link
                 href={`/dashboard/station/${stationSlug}/quality-engine`}
                 onClick={() => setMobileOpen(false)}
