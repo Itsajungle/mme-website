@@ -1620,11 +1620,13 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   <span className="text-xs text-accent font-mono">Producing...</span>
                 </motion.div>
               ) : composedVideoUrl ? (
-                <video
-                  src={composedVideoUrl}
-                  controls
-                  className="w-full h-full object-contain"
-                />
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <Check size={20} className="text-emerald-400" />
+                  </div>
+                  <span className="text-xs text-emerald-400 font-semibold">Final video ready</span>
+                  <span className="text-[10px] text-text-muted">Scroll down to view &amp; download</span>
+                </div>
               ) : pipelineStage === "complete" || presenterVideosReady ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center">
@@ -1767,6 +1769,44 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           </div>
         </div>
       </div>
+
+      {/* === COMPOSED VIDEO — FULL WIDTH BOTTOM === */}
+      {composedVideoUrl && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="border-t border-border px-6 py-8"
+        >
+          <div className="max-w-4xl mx-auto space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Film size={16} className="text-accent" />
+                <h3 className="text-sm font-semibold text-text">Final Composed Video</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={composedVideoUrl}
+                  download
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 bg-bg-deep text-accent hover:bg-accent/10 transition-colors"
+                >
+                  <Download size={14} />
+                  Download Video
+                </a>
+              </div>
+            </div>
+            <div className="rounded-xl border border-accent/20 bg-black overflow-hidden">
+              <video
+                src={composedVideoUrl}
+                controls
+                autoPlay
+                className="w-full"
+                style={{ maxHeight: "70vh" }}
+              />
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
