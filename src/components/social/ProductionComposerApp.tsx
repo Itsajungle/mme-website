@@ -1331,6 +1331,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           <div className="p-6 space-y-3">
             <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono">Preview</label>
 
+            {/* Final composed video or producing spinner */}
             <div className={cn(
               "rounded-lg border border-border bg-bg-deep flex items-center justify-center relative overflow-hidden",
               aspectRatio === "9:16" ? "aspect-[9/16] max-h-64" : aspectRatio === "1:1" ? "aspect-square" : "aspect-video"
@@ -1346,12 +1347,13 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   controls
                   className="w-full h-full object-contain"
                 />
-              ) : pipelineStage === "complete" ? (
+              ) : pipelineStage === "complete" || presenterVideosReady ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center">
-                    <Play size={20} className="text-accent ml-0.5" />
+                    <Check size={20} className="text-accent" />
                   </div>
-                  <span className="text-xs text-text-muted">Video ready</span>
+                  <span className="text-xs text-accent font-semibold">Presenter videos generated</span>
+                  <span className="text-[10px] text-text-muted">Watch individual clips below</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-text-muted">
@@ -1364,6 +1366,28 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 {formatDuration(totalDuration)}
               </div>
             </div>
+
+            {/* Individual presenter clip videos */}
+            {clips.some((c) => c.type === "presenter" && c.status === "complete" && c.videoUrl) && (
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono">Presenter Clips</label>
+                {clips.filter((c) => c.type === "presenter" && c.status === "complete" && c.videoUrl).map((clip) => (
+                  <div key={clip.clipNumber} className="rounded-lg border border-border bg-bg-deep overflow-hidden">
+                    <div className="px-3 py-1.5 bg-blue-400/10 border-b border-border flex items-center gap-2">
+                      <User size={10} className="text-blue-400" />
+                      <span className="text-[10px] font-mono text-blue-400 font-bold">Clip {clip.clipNumber}</span>
+                      <span className="text-[10px] text-text-muted">{clip.label}</span>
+                    </div>
+                    <video
+                      src={clip.videoUrl}
+                      controls
+                      className="w-full"
+                      style={{ maxHeight: "300px" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Produce Video button */}
             <button
