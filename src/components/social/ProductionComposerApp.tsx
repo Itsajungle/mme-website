@@ -18,6 +18,7 @@ import {
   ChevronUp,
   Mic,
   RotateCcw,
+  Trash2,
   Monitor,
   Square,
   Smartphone,
@@ -76,7 +77,8 @@ const DEFAULT_CLIPS: TimelineClip[] = [
   { clipNumber: 7, type: "remotion_outro", label: "Brand Outro", duration: 3, status: "pending" },
 ];
 
-function getClipStartTime(clips: TimelineClip[], clipIndex: number): number {
+function getClipStartTime(clips: TimelineClip[] | undefined, clipIndex: number): number {
+  if (!clips || clipIndex < 0) return 0;
   return clips.slice(0, clipIndex).reduce((sum, c) => sum + c.duration, 0);
 }
 
@@ -217,7 +219,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [imageReady, setImageReady] = useState(saved.current?.imageReady ?? false);
   const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(saved.current?.composedVideoUrl ?? null);
   const [renderId, setRenderId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(saved.current?.errorMessage ?? null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Demo mode
   const [demoMode, setDemoMode] = useState(saved.current?.demoMode ?? false);
@@ -233,11 +235,10 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       imageReady,
       composedVideoUrl,
       demoMode,
-      errorMessage,
       savedAt: Date.now(),
     };
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
-  }, [clips, brief, scriptGenerated, pipelineStage, presenterVideosReady, imageReady, composedVideoUrl, demoMode, errorMessage, storageKey]);
+  }, [clips, brief, scriptGenerated, pipelineStage, presenterVideosReady, imageReady, composedVideoUrl, demoMode, storageKey]);
 
   // Polling refs
   const pollingRef = useRef<Record<string, NodeJS.Timeout>>({});
@@ -736,6 +737,36 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       setErrorMessage(msg);
       setPipelineStage("error");
     }
+  };
+
+  // ─── Reset production ───────────────────────────────────────────────────
+
+  const handleReset = () => {
+    // Stop any active polling
+    Object.values(pollingRef.current).forEach((t) => clearInterval(t));
+    pollingRef.current = {};
+    if (composePollingRef.current) {
+      clearInterval(composePollingRef.current);
+      composePollingRef.current = null;
+    }
+
+    // Reset all state to defaults
+    setClips(DEFAULT_CLIPS.map((c) => ({ ...c })));
+    setBrief({ concept: "" });
+    setScriptGenerated(false);
+    setScriptEditing(false);
+    setPipelineStage("idle");
+    setPipelineProgress(0);
+    setPresenterVideosReady(false);
+    setImageReady(false);
+    setComposedVideoUrl(null);
+    setRenderId(null);
+    setErrorMessage(null);
+    setDemoMode(false);
+    setExpandedClip(null);
+
+    // Clear localStorage
+    try { localStorage.removeItem(storageKey); } catch {}
   };
 
   // ─── Retry single clip ──────────────────────────────────────────────────
@@ -1694,6 +1725,17 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 <Download size={14} />
                 Download Video
               </a>
+            )}
+
+            {/* Reset Production — always visible when there's any state to clear */}
+            {(scriptGenerated || presenterVideosReady || composedVideoUrl || pipelineStage === "error") && !isProducing && (
+              <button
+                onClick={handleReset}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors border border-red-500/20 bg-bg-deep text-red-400/70 hover:text-red-300 hover:border-red-500/40 hover:bg-red-500/5"
+              >
+                <Trash2 size={12} />
+                Reset Production
+              </button>
             )}
           </div>
         </div>
