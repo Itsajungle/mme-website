@@ -208,6 +208,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const pollingRef = useRef<Record<string, NodeJS.Timeout>>({});
   const composePollingRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Voice map from API (avatar_id → ElevenLabs voice_id)
+  const [avatarVoiceMap, setAvatarVoiceMap] = useState<Record<string, string>>({});
+
   // ─── Fetch avatars ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -217,14 +220,19 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       .then((data) => {
         const list: Avatar[] = data.avatars ?? [];
         setAvatars(list);
-        if (list.length > 0 && !selectedAvatarId) {
-          setSelectedAvatarId(list[0].avatar_id);
+        if (data.voiceMap) setAvatarVoiceMap(data.voiceMap);
+        const defaultId = data.defaultAvatarId || "Marcus_Suit_Front_public";
+        if (!selectedAvatarId) {
+          setSelectedAvatarId(defaultId);
+          if (data.voiceMap?.[defaultId]) {
+            setSelectedVoiceId(data.voiceMap[defaultId]);
+          }
         }
       })
       .catch(() => {
         setAvatars([
-          { avatar_id: "demo-1", avatar_name: "Aria", preview_image_url: "" },
-          { avatar_id: "demo-2", avatar_name: "Marcus", preview_image_url: "" },
+          { avatar_id: "demo-1", avatar_name: "Aria", preview_image_url: "", group: "stock" },
+          { avatar_id: "demo-2", avatar_name: "Marcus", preview_image_url: "", group: "stock" },
         ]);
       })
       .finally(() => setAvatarsLoading(false));
@@ -993,36 +1001,91 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 Loading presenters...
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                {avatars.slice(0, 8).map((avatar) => (
-                  <button
-                    key={avatar.avatar_id}
-                    onClick={() => setSelectedAvatarId(avatar.avatar_id)}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all text-center",
-                      selectedAvatarId === avatar.avatar_id
-                        ? "border-accent bg-accent/10"
-                        : "border-border bg-bg-deep hover:border-border"
-                    )}
-                  >
-                    {avatar.preview_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatar.preview_image_url}
-                        alt={avatar.avatar_name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center",
-                        selectedAvatarId === avatar.avatar_id ? "bg-accent/20" : "bg-white/5"
-                      )}>
-                        <User size={16} className={selectedAvatarId === avatar.avatar_id ? "text-accent" : "text-text-muted"} />
-                      </div>
-                    )}
-                    <span className="text-[11px] text-text font-medium truncate w-full">{avatar.avatar_name}</span>
-                  </button>
-                ))}
+              <div className="max-h-72 overflow-y-auto space-y-3">
+                {/* Stock Presenters */}
+                {avatars.filter((a) => a.group !== "custom").length > 0 && (
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-text-muted font-mono mb-1.5">Stock Presenters</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {avatars.filter((a) => a.group !== "custom").map((avatar) => (
+                        <button
+                          key={avatar.avatar_id}
+                          onClick={() => {
+                            setSelectedAvatarId(avatar.avatar_id);
+                            if (avatarVoiceMap[avatar.avatar_id]) {
+                              setSelectedVoiceId(avatarVoiceMap[avatar.avatar_id]);
+                            }
+                          }}
+                          className={cn(
+                            "flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all text-center",
+                            selectedAvatarId === avatar.avatar_id
+                              ? "border-accent bg-accent/10"
+                              : "border-border bg-bg-deep hover:border-border"
+                          )}
+                        >
+                          {avatar.preview_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={avatar.preview_image_url}
+                              alt={avatar.avatar_name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center",
+                              selectedAvatarId === avatar.avatar_id ? "bg-accent/20" : "bg-white/5"
+                            )}>
+                              <User size={16} className={selectedAvatarId === avatar.avatar_id ? "text-accent" : "text-text-muted"} />
+                            </div>
+                          )}
+                          <span className="text-[11px] text-text font-medium truncate w-full">{avatar.avatar_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Custom Presenters */}
+                {avatars.filter((a) => a.group === "custom").length > 0 && (
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-text-muted font-mono mb-1.5">Custom Presenters</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {avatars.filter((a) => a.group === "custom").map((avatar) => (
+                        <button
+                          key={avatar.avatar_id}
+                          onClick={() => {
+                            setSelectedAvatarId(avatar.avatar_id);
+                            if (avatarVoiceMap[avatar.avatar_id]) {
+                              setSelectedVoiceId(avatarVoiceMap[avatar.avatar_id]);
+                            }
+                          }}
+                          className={cn(
+                            "flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all text-center",
+                            selectedAvatarId === avatar.avatar_id
+                              ? "border-accent bg-accent/10"
+                              : "border-border bg-bg-deep hover:border-border"
+                          )}
+                        >
+                          {avatar.preview_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={avatar.preview_image_url}
+                              alt={avatar.avatar_name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center",
+                              selectedAvatarId === avatar.avatar_id ? "bg-accent/20" : "bg-white/5"
+                            )}>
+                              <User size={16} className={selectedAvatarId === avatar.avatar_id ? "text-accent" : "text-text-muted"} />
+                            </div>
+                          )}
+                          <span className="text-[11px] text-text font-medium truncate w-full">{avatar.avatar_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

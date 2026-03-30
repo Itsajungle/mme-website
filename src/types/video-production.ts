@@ -60,6 +60,7 @@ export interface Avatar {
   avatar_name: string;
   preview_image_url: string;
   gender?: string;
+  group?: "stock" | "custom";
 }
 
 export interface PresenterGenerateRequest {
