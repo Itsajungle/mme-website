@@ -1,5 +1,6 @@
-// Script generator — template-based script generation for radio ads
-// No external API required — uses intelligent templates with brand context
+// Script generator — AI-based script generation with template fallback
+// Primary: calls /api/radio/generate-script (Claude AI)
+// Fallback: uses intelligent templates with brand context
 
 export interface ScriptSegment {
   type: "music" | "voice" | "sfx";
@@ -16,7 +17,7 @@ export interface GeneratedScript {
   estimatedDuration: number;
 }
 
-interface ScriptInput {
+export interface ScriptInput {
   brand: {
     name: string;
     locations: { name: string; address: string }[];
@@ -30,6 +31,79 @@ interface ScriptInput {
   triggerContext?: string;
   duration: number; // 15, 30, or 60
   tone: "friendly" | "urgent" | "professional" | "humorous" | "emotional";
+}
+
+// AI-based script generation — calls the API route
+export async function generateScriptAI(input: ScriptInput): Promise<GeneratedScript> {
+  const res = await fetch("/api/radio/generate-script", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      promotion: input.promotion,
+      duration: input.duration,
+      tone: input.tone,
+      triggerType: input.triggerType,
+      brandName: input.brand.name,
+      businessType: input.brand.sector,
+      locations: input.brand.locations,
+      logoLine: input.brand.logoLine,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "API error" }));
+    throw new Error(err.error || `Script generation failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  const { segments: aiSegments, wordCount, estimatedDuration } = data;
+
+  // Convert AI response segments to our ScriptSegment format
+  const segments: ScriptSegment[] = aiSegments.map(
+    (seg: { type: string; text?: string; direction?: string }) => {
+      if (seg.type === "voice") {
+        const words = (seg.text || "").split(/\s+/).filter(Boolean).length;
+        return {
+          type: "voice" as const,
+          text: seg.text || "",
+          duration: words / 2.5,
+        };
+      }
+      // Music / SFX — parse duration from direction if possible
+      const durMatch = (seg.direction || "").match(/(\d+(?:\.\d+)?)s/);
+      const dur = durMatch ? parseFloat(durMatch[1]) : 2;
+      return {
+        type: seg.type as "music" | "sfx",
+        text: "",
+        duration: dur,
+        direction: seg.direction || "",
+      };
+    }
+  );
+
+  // Build fullText and directions
+  let fullText = "";
+  let directions = "";
+  for (const seg of segments) {
+    if (seg.direction) {
+      fullText += seg.direction + "\n\n";
+      directions += seg.direction + "\n";
+    }
+    if (seg.type === "voice" && seg.text) {
+      const voiceLabel = input.brand.voiceName
+        ? `VOICE (${input.brand.voiceName} — ${input.brand.voiceDescription || ""})`
+        : "VOICE";
+      fullText += `${voiceLabel}:\n"${seg.text}"\n\n`;
+    }
+  }
+
+  return {
+    fullText: fullText.trim(),
+    segments,
+    directions: directions.trim(),
+    wordCount,
+    estimatedDuration,
+  };
 }
 
 // Word count targets at 2.5 words/sec

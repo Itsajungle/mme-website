@@ -11,6 +11,7 @@ import {
   X,
   Check,
   Loader2,
+  Volume2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,30 +34,57 @@ export function ScriptEditor({
   duration,
   brandName,
   triggerType,
+  onRegenerateScript,
+  onRegenerateAudio,
+  isGenerating,
 }: {
   script: string;
   onChange: (script: string) => void;
   duration: string;
   brandName: string;
   triggerType?: string;
+  onRegenerateScript?: () => void;
+  onRegenerateAudio?: () => void;
+  isGenerating?: boolean;
 }) {
   const [showPanel, setShowPanel] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
 
-  const stats = useMemo(() => {
-    const trimmed = script.trim();
-    const chars = trimmed.length;
-    const words = trimmed ? trimmed.split(/\s+/).length : 0;
-    const targetSeconds = parseInt(duration);
-    const wps = WORDS_PER_SECOND[duration] || 2.5;
-    const targetWords = Math.round(targetSeconds * wps);
-    const estimatedSeconds = Math.round(words / wps);
-    const withinTarget =
-      words >= targetWords * 0.8 && words <= targetWords * 1.15;
+  // Word count targets matching the AI prompt ranges
+  const TIGHT_TARGETS: Record<string, { min: number; max: number }> = {
+    "15s": { min: 35, max: 40 },
+    "30s": { min: 70, max: 80 },
+    "60s": { min: 140, max: 160 },
+  };
 
-    return { chars, words, targetWords, estimatedSeconds, withinTarget };
+  const stats = useMemo(() => {
+    // Count only voice lines — strip directions, music/sfx cues
+    const voiceOnly = script
+      .replace(/\[.*?\]/g, "")
+      .replace(/VOICE.*?:\n/g, "")
+      .replace(/"/g, "")
+      .trim();
+    const chars = voiceOnly.length;
+    const words = voiceOnly ? voiceOnly.split(/\s+/).filter(Boolean).length : 0;
+    const wps = WORDS_PER_SECOND[duration] || 2.5;
+    const estimatedSeconds = Math.round(words / wps);
+
+    const target = TIGHT_TARGETS[duration];
+    const targetWords = target ? Math.round((target.min + target.max) / 2) : Math.round(parseInt(duration) * wps);
+    const min = target?.min ?? targetWords * 0.8;
+    const max = target?.max ?? targetWords * 1.15;
+
+    // Status: green (in range), amber (close — within 10% outside), red (way off)
+    let status: "green" | "amber" | "red" = "green";
+    if (words < min || words > max) {
+      const offBy = words < min ? min - words : words - max;
+      const threshold = Math.round((max - min) * 0.5);
+      status = offBy <= threshold ? "amber" : "red";
+    }
+
+    return { chars, words, targetWords, estimatedSeconds, min, max, status };
   }, [script, duration]);
 
   const fetchSuggestions = useCallback(async () => {
@@ -125,9 +153,11 @@ export function ScriptEditor({
       <div
         className={cn(
           "rounded-xl border-2 transition-all duration-300 overflow-hidden",
-          stats.withinTarget
+          stats.status === "green"
             ? "border-accent/40 shadow-[0_0_24px_rgba(0,255,150,0.06)]"
-            : "border-border"
+            : stats.status === "amber"
+            ? "border-amber-500/40 shadow-[0_0_24px_rgba(245,158,11,0.06)]"
+            : "border-red-500/40 shadow-[0_0_24px_rgba(239,68,68,0.06)]"
         )}
       >
         <textarea
@@ -152,10 +182,17 @@ export function ScriptEditor({
           <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <Type size={12} />
             <span>
-              <span className="text-text-secondary font-mono">
+              <span
+                className={cn(
+                  "font-mono font-bold",
+                  stats.status === "green" ? "text-accent" : stats.status === "amber" ? "text-amber-400" : "text-red-400"
+                )}
+              >
                 {stats.words}
               </span>
-              /{stats.targetWords} words
+              <span className="text-text-muted">
+                /{stats.min}–{stats.max} words
+              </span>
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-text-muted">
@@ -165,7 +202,7 @@ export function ScriptEditor({
               <span
                 className={cn(
                   "font-mono",
-                  stats.withinTarget ? "text-accent" : "text-text-secondary"
+                  stats.status === "green" ? "text-accent" : stats.status === "amber" ? "text-amber-400" : "text-red-400"
                 )}
               >
                 {stats.estimatedSeconds}s
@@ -173,15 +210,20 @@ export function ScriptEditor({
               /{duration}
             </span>
           </div>
-          {stats.withinTarget && (
-            <motion.span
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="ml-auto inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent"
-            >
-              ON TARGET
-            </motion.span>
-          )}
+          <motion.span
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={cn(
+              "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
+              stats.status === "green"
+                ? "bg-accent/10 text-accent"
+                : stats.status === "amber"
+                ? "bg-amber-500/10 text-amber-400"
+                : "bg-red-500/10 text-red-400"
+            )}
+          >
+            {stats.status === "green" ? "ON TARGET" : stats.status === "amber" ? "CLOSE" : "OUT OF RANGE"}
+          </motion.span>
         </div>
       </div>
 
@@ -194,6 +236,38 @@ export function ScriptEditor({
           </span>
         </div>
       )}
+
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        {onRegenerateScript && (
+          <button
+            onClick={onRegenerateScript}
+            disabled={isGenerating}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-secondary hover:border-accent/40 hover:text-text transition-colors disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <Loader2 size={16} className="text-accent animate-spin" />
+            ) : (
+              <Sparkles size={16} className="text-accent" />
+            )}
+            Regenerate Script
+          </button>
+        )}
+        {onRegenerateAudio && (
+          <button
+            onClick={onRegenerateAudio}
+            disabled={isGenerating}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm font-bold text-accent hover:bg-accent/10 transition-colors disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Volume2 size={16} />
+            )}
+            Regenerate Audio
+          </button>
+        )}
+      </div>
 
       {/* Suggest Improvements Button */}
       <button

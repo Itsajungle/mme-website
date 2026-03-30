@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Brand } from "@/lib/demo-data";
 import { useAudioEngine } from "@/lib/audio-engine/engine-provider";
-import { generateScript, type GeneratedScript } from "@/lib/audio-engine/script-generator";
+import { generateScript, generateScriptAI, type GeneratedScript } from "@/lib/audio-engine/script-generator";
 import { ScriptEditor } from "./ScriptEditor";
 import { AudioPreview } from "./AudioPreview";
 import { ComProdScore } from "./ComProdScore";
@@ -173,35 +173,42 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
     setSfxPreviewLoading(null);
   }, []);
 
-  // Generate script
-  const handleGenerateScript = useCallback(() => {
+  // Generate script — AI primary, template fallback
+  const handleGenerateScript = useCallback(async () => {
     setPipelineStep("script");
-    // Small delay for visual feedback
-    setTimeout(() => {
-      const result = generateScript({
-        brand: {
-          name: brand.name,
-          locations: brand.locations,
-          logoLine: brand.logoLine,
-          sector: brand.sectorName,
-          voiceName: brand.audioBrandKit.voiceName,
-          voiceDescription: brand.audioBrandKit.voiceDescription,
-        },
-        promotion,
-        triggerType,
-        duration: durationSeconds,
-        tone,
-      });
-      setScript(result);
-      setScriptText(result.fullText);
-      setPipelineStep("idle");
+    setGenerationError("");
 
-      if (mode === "automated") {
-        // Auto-approve and continue to audio generation
-        setScriptApproved(true);
-        handleGenerateAudio(result.fullText);
-      }
-    }, 800);
+    const scriptInput = {
+      brand: {
+        name: brand.name,
+        locations: brand.locations,
+        logoLine: brand.logoLine,
+        sector: brand.sectorName,
+        voiceName: brand.audioBrandKit.voiceName,
+        voiceDescription: brand.audioBrandKit.voiceDescription,
+      },
+      promotion,
+      triggerType,
+      duration: durationSeconds,
+      tone,
+    };
+
+    let result: GeneratedScript;
+    try {
+      result = await generateScriptAI(scriptInput);
+    } catch (err) {
+      console.warn("[RadioAdGenerator] AI script generation failed, using template fallback:", err);
+      result = generateScript(scriptInput);
+    }
+
+    setScript(result);
+    setScriptText(result.fullText);
+    setPipelineStep("idle");
+
+    if (mode === "automated") {
+      setScriptApproved(true);
+      handleGenerateAudio(result.fullText);
+    }
   }, [brand, promotion, triggerType, durationSeconds, tone, mode]);
 
   // Generate audio
@@ -950,50 +957,37 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
           transition={{ duration: 0.5 }}
           className="space-y-4"
         >
-          {/* Script Editor (Hybrid mode) or Read-only (Automated) */}
-          {mode === "hybrid" && !scriptApproved ? (
-            <>
-              <ScriptEditor
-                script={scriptText}
-                onChange={setScriptText}
-                duration={duration}
-                brandName={brand.name}
-                triggerType={triggerType}
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setScript(null);
-                    setScriptText("");
-                    handleGenerateScript();
-                  }}
-                  className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-secondary hover:border-border-hover transition-colors"
-                >
-                  Regenerate
-                </button>
-                <button
-                  onClick={() => {
-                    setScriptApproved(true);
-                    handleGenerateAudio();
-                  }}
-                  className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-bg hover:bg-accent-hover transition-colors"
-                >
-                  Approve Script
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-xl border border-border bg-bg-card p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-heading text-sm font-bold text-text">Generated Script</h3>
-                <span className="text-xs text-text-muted font-mono">
-                  {duration} &middot; {triggerType} trigger &middot; {tone}
-                </span>
-              </div>
-              <pre className="whitespace-pre-wrap rounded-lg border border-border bg-bg-deep p-4 font-mono text-xs leading-relaxed text-text-secondary">
-                {scriptText}
-              </pre>
-            </div>
+          {/* Script Editor — always visible and editable */}
+          <ScriptEditor
+            script={scriptText}
+            onChange={setScriptText}
+            duration={duration}
+            brandName={brand.name}
+            triggerType={triggerType}
+            onRegenerateScript={() => {
+              setScript(null);
+              setScriptText("");
+              setScriptApproved(false);
+              setAudioGenerated(false);
+              handleGenerateScript();
+            }}
+            onRegenerateAudio={scriptApproved || audioGenerated ? () => handleGenerateAudio() : undefined}
+            isGenerating={pipelineStep !== "idle" && pipelineStep !== "complete"}
+          />
+
+          {/* Approve Script Button (shown before first audio generation) */}
+          {mode === "hybrid" && !scriptApproved && (
+            <button
+              onClick={() => {
+                setScriptApproved(true);
+                handleGenerateAudio();
+              }}
+              disabled={pipelineStep !== "idle"}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-4 text-sm font-bold text-bg transition-all hover:bg-accent-hover disabled:opacity-50"
+            >
+              <CheckCircle2 size={18} />
+              Approve Script &amp; Generate Audio
+            </button>
           )}
 
           {/* ComProd Director Score */}
@@ -1007,17 +1001,6 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
             hasSFX={true}
             onScriptChange={setScriptText}
           />
-
-          {/* Generate Audio Button (Hybrid, after script approval) */}
-          {mode === "hybrid" && scriptApproved && !audioGenerated && pipelineStep === "idle" && (
-            <button
-              onClick={() => handleGenerateAudio()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-accent/30 px-6 py-4 text-sm font-bold text-accent transition-all hover:bg-accent/5"
-            >
-              <Volume2 size={18} />
-              Generate Audio
-            </button>
-          )}
 
           {/* Audio Preview */}
           <AudioPreview
