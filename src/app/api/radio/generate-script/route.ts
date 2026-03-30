@@ -162,3 +162,4 @@ This is a ${durationStr}-second ad. You MUST land within ${target.min}–${targe
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+// rebuild trigger
