@@ -297,8 +297,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Script generation failed");
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = typeof errData?.error === "string" ? errData.error : JSON.stringify(errData?.error ?? `Status ${res.status}`);
+        throw new Error(errMsg || "Script generation failed");
       }
 
       const script: GeneratedScript = await res.json();
@@ -373,6 +374,20 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
     setPresenterVideosReady(false);
     setImageReady(false);
 
+    // Validate before starting
+    if (!selectedAvatarId) {
+      setErrorMessage("Please select an AI Presenter before producing.");
+      return;
+    }
+    if (!selectedVoiceId) {
+      setErrorMessage("Please select a voice before producing.");
+      return;
+    }
+    if (!brief.concept.trim()) {
+      setErrorMessage("Please enter a campaign brief before producing.");
+      return;
+    }
+
     // Stage 1: Script (if not ready)
     if (!scriptGenerated) {
       await handleGenerateScript();
@@ -407,8 +422,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || `Presenter generation failed for clip ${clip.clipNumber}`);
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = typeof errData?.error === "string" ? errData.error : JSON.stringify(errData?.error ?? `Status ${res.status}`);
+          throw new Error(errMsg || `Presenter generation failed for clip ${clip.clipNumber}`);
         }
 
         const data = await res.json();
@@ -542,8 +558,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       });
 
       if (!composeRes.ok) {
-        const err = await composeRes.json();
-        throw new Error(err.error || "Composition failed");
+        const errData = await composeRes.json().catch(() => ({}));
+        const errMsg = typeof errData?.error === "string" ? errData.error : JSON.stringify(errData?.error ?? `Status ${composeRes.status}`);
+        throw new Error(errMsg || "Composition failed");
       }
 
       const composeData = await composeRes.json();
@@ -586,7 +603,14 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       setPipelineProgress(100);
     } catch (err) {
       console.error("[produce-video]", err);
-      setErrorMessage(err instanceof Error ? err.message : "Production failed");
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : typeof err === "object" && err !== null
+            ? JSON.stringify(err)
+            : "Production failed — check console for details";
+      setErrorMessage(msg);
       setPipelineStage("error");
     }
   };
