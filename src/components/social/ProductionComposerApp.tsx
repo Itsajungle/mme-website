@@ -348,7 +348,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             } else if (data.status === "failed" || attempts >= maxAttempts) {
               clearInterval(interval);
               delete pollingRef.current[`clip-${clipNumber}`];
-              reject(new Error(data.error || "Presenter video generation timed out"));
+              const errMsg = typeof data.error === "string" ? data.error : JSON.stringify(data.error ?? "Presenter video generation timed out");
+              reject(new Error(errMsg));
             }
           } catch {
             if (attempts >= maxAttempts) {
@@ -400,15 +401,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
 
     try {
       // Launch all presenter clips in parallel
+      let detectedDemoMode = false;
       const presenterPromises = presenterClips.map(async (clip) => {
         updateClip(clip.clipNumber, { status: "generating" });
-
-        if (demoMode) {
-          // In demo mode, simulate a delay and return empty URL
-          await new Promise((r) => setTimeout(r, 2000));
-          updateClip(clip.clipNumber, { status: "complete", videoUrl: "" });
-          return { clipNumber: clip.clipNumber, videoUrl: "" };
-        }
 
         const res = await fetch("/api/video/generate-presenter", {
           method: "POST",
@@ -428,14 +423,39 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         }
 
         const data = await res.json();
+
+        // Detect demo mode from API response (no presenter engine key configured)
+        if (data.source === "demo") {
+          detectedDemoMode = true;
+          // In demo mode, skip polling — no real video to wait for
+          await new Promise((r) => setTimeout(r, 1500));
+          updateClip(clip.clipNumber, { status: "complete", videoUrl: "" });
+          return { clipNumber: clip.clipNumber, videoUrl: "", demo: true };
+        }
+
         const videoUrl = await pollPresenterStatus(data.video_id, clip.clipNumber);
         updateClip(clip.clipNumber, { status: "complete", videoUrl });
-        return { clipNumber: clip.clipNumber, videoUrl };
+        return { clipNumber: clip.clipNumber, videoUrl, demo: false };
       });
 
       const presenterResults = await Promise.all(presenterPromises);
       setPresenterVideosReady(true);
       setPipelineProgress(50);
+
+      // If demo mode detected, mark pipeline as demo-complete and skip composition
+      if (detectedDemoMode) {
+        setDemoMode(true);
+        // Mark all remaining clips as complete for visual feedback
+        for (const clip of clips) {
+          if (clip.type !== "presenter") {
+            updateClip(clip.clipNumber, { status: "complete" });
+          }
+        }
+        setPipelineStage("complete");
+        setPipelineProgress(100);
+        setErrorMessage("Demo mode — AI Presenter engine not connected. Script and timeline are ready for review. Connect the presenter engine to produce final video.");
+        return;
+      }
 
       // Stage 3: Clip 3 Image
       setPipelineStage("images");
@@ -586,7 +606,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             } else if (data.status === "failed" || attempts >= 60) {
               clearInterval(interval);
               composePollingRef.current = null;
-              reject(new Error(data.error || "Composition timed out"));
+              const errMsg = typeof data.error === "string" ? data.error : JSON.stringify(data.error ?? "Composition timed out");
+              reject(new Error(errMsg));
             }
           } catch {
             if (attempts >= 60) {
@@ -636,7 +657,10 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) {
+          const errMsg = typeof data?.error === "string" ? data.error : JSON.stringify(data?.error ?? `Status ${res.status}`);
+          throw new Error(errMsg || `Presenter generation failed for clip ${clipNumber}`);
+        }
         const videoUrl = await pollPresenterStatus(data.video_id, clipNumber);
         updateClip(clipNumber, { status: "complete", videoUrl });
       } else if (clip.type === "image_overlay" && clip.imagePrompt) {
