@@ -197,17 +197,22 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   // Image source for clip 3
   const [imageSource, setImageSource] = useState<ImageSource>("ai_generated");
 
-  // Timeline clips
-  const [clips, setClips] = useState<TimelineClip[]>(saved.current?.clips ?? DEFAULT_CLIPS);
+  // Timeline clips — sanitise any "generating" clips back to "pending" on restore
+  // (prevents stuck loop if page was refreshed mid-generation)
+  const restoredClips: TimelineClip[] = (saved.current?.clips ?? DEFAULT_CLIPS).map(
+    (c: TimelineClip) => c.status === "generating" ? { ...c, status: "pending" as ClipStatus } : c
+  );
+  const [clips, setClips] = useState<TimelineClip[]>(restoredClips);
   const [expandedClip, setExpandedClip] = useState<number | null>(null);
 
   // Script state
   const [scriptGenerated, setScriptGenerated] = useState(saved.current?.scriptGenerated ?? false);
   const [scriptEditing, setScriptEditing] = useState(false);
 
-  // Pipeline state
-  const [pipelineStage, setPipelineStage] = useState<PipelineStage>(saved.current?.pipelineStage === "complete" ? "complete" : "idle");
-  const [pipelineProgress, setPipelineProgress] = useState(saved.current?.pipelineStage === "complete" ? 100 : 0);
+  // Pipeline state — only restore "complete", everything else resets to "idle"
+  const safePipelineStage = saved.current?.pipelineStage;
+  const [pipelineStage, setPipelineStage] = useState<PipelineStage>(safePipelineStage === "complete" ? "complete" : "idle");
+  const [pipelineProgress, setPipelineProgress] = useState(safePipelineStage === "complete" ? 100 : 0);
   const [presenterVideosReady, setPresenterVideosReady] = useState(saved.current?.presenterVideosReady ?? false);
   const [imageReady, setImageReady] = useState(saved.current?.imageReady ?? false);
   const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(saved.current?.composedVideoUrl ?? null);
