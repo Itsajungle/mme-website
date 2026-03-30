@@ -218,14 +218,18 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
       setGenerationError("");
 
       // Extract voice-only text (remove directions)
-      const voiceOnlyText = scriptToUse
+      let voiceOnlyText = scriptToUse
         .replace(/\[.*?\]/g, "")
         .replace(/VOICE.*?:\n/g, "")
         .replace(/"/g, "")
         .replace(/\n{2,}/g, " ")
         .trim();
 
-      if (!voiceOnlyText) return;
+      // Fallback: if regex extraction produced empty/very short result, use raw script
+      if (!voiceOnlyText || voiceOnlyText.length < 5) {
+        voiceOnlyText = scriptToUse.trim();
+        if (!voiceOnlyText) return;
+      }
 
       // Step 1: Voice synthesis (required — blocks on failure)
       setPipelineStep("voice");
@@ -252,12 +256,13 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
       // Step 2: Music generation (non-blocking — continue without if it fails)
       setPipelineStep("music");
       let generatedMusicUrl = "";
+      let musicFailed = false;
       try {
         const musicRes = await fetch("/api/audio/music-generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: `Instrumental background music bed, no vocals, no singing, for a ${tone} ${brand.sectorName} radio ad, ${durationSeconds} seconds, gentle underscore`,
+            prompt: `Instrumental background music bed, no vocals, no singing, ${musicMood} mood, for a ${tone} ${brand.sectorName} radio ad, ${durationSeconds} seconds, gentle underscore`,
             durationSeconds: durationSeconds + 4,
           }),
         });
@@ -265,9 +270,13 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
         if (musicRes.ok && musicData.url) {
           generatedMusicUrl = musicData.url;
           setMusicUrl(musicData.url);
+        } else {
+          musicFailed = true;
         }
-      } catch {
-        // Music generation failed — continue without music
+      } catch (err) {
+        // Music generation failed — continue without music but log the issue
+        console.warn('[RadioAdGenerator] Music generation failed, continuing with voice-only:', err);
+        musicFailed = true;
       }
 
       // Step 3: SFX generation — generate ALL selected SFX in parallel
@@ -289,8 +298,9 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
             if (sfxRes.ok && sfxData.url) {
               return { name: sfxName, url: sfxData.url };
             }
-          } catch {
-            // Individual SFX failed — skip it
+          } catch (err) {
+            // Individual SFX failed — skip it but log
+            console.warn(`[RadioAdGenerator] SFX generation failed for "${sfxName}":`, err);
           }
           return null;
         });
@@ -360,6 +370,14 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
       }
 
       setAudioGenerated(true);
+
+      // Provide feedback if music generation failed
+      if (musicFailed && generatedSfxList.length === 0) {
+        setGenerationError("Music generation unavailable — proceeding with voice-only");
+      } else if (musicFailed) {
+        setGenerationError("Music generation unavailable — using voice and sound effects");
+      }
+
       setPipelineStep("complete");
 
       // Send stems to Production Timeline
@@ -389,7 +407,7 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
         onAudioGenerated(timelineSegs, duration);
       }
     },
-    [scriptText, selectedVoiceId, engine, durationSeconds, brand, tone, triggerType, duration, onAudioGenerated, selectedSfx]
+    [scriptText, selectedVoiceId, engine, durationSeconds, brand, tone, triggerType, duration, onAudioGenerated, selectedSfx, musicMood]
   );
 
   // Remix with current stems
@@ -400,7 +418,10 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
     const useVoiceDur = vDur || stemVoiceDuration;
     const useMusicUrl = mUrl !== undefined ? mUrl : musicUrl;
     const useSfxUrl = sUrl !== undefined ? sUrl : (sfxUrls[0] || "");
-    if (!useVoiceUrl) return;
+    if (!useVoiceUrl) {
+      setGenerationError("Voice audio is required to remix — please generate voice first");
+      return;
+    }
 
     setRegenerating("remix");
     try {

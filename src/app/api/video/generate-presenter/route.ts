@@ -64,14 +64,14 @@ async function saveAudioAndGetUrl(
   await writeFile(join(AUDIO_DIR, filename), audioBuffer);
 
   // Build public URL — use APP_URL env var if set (for reverse proxy scenarios),
-  // otherwise derive from the incoming request
+  // otherwise use production domain (Docker/Coolify proxy makes req.url localhost)
   const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
   let origin: string;
   if (appUrl) {
     origin = appUrl.replace(/\/$/, "");
   } else {
-    const url = new URL(requestUrl);
-    origin = `${url.protocol}//${url.host}`;
+    // Hardcoded fallback for production — req.url is localhost behind reverse proxy
+    origin = "https://momentmarketingengine.com";
   }
   console.log(`[generate-presenter] Audio serve origin: ${origin}`);
   return `${origin}/api/audio/serve?file=${filename}`;
