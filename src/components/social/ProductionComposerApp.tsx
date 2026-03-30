@@ -260,9 +260,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         const defaultId = data.defaultAvatarId || "Marcus_Suit_Front_public";
         if (!selectedAvatarId) {
           setSelectedAvatarId(defaultId);
-          if (data.voiceMap?.[defaultId]) {
-            setSelectedVoiceId(data.voiceMap[defaultId]);
-          }
+          // Don't override voice from brand kit — the avatar voice map contains
+          // presenter engine voice IDs, not ElevenLabs IDs. Brand voiceId is correct.
         }
       })
       .catch(() => {
@@ -1380,9 +1379,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                           key={avatar.avatar_id}
                           onClick={() => {
                             setSelectedAvatarId(avatar.avatar_id);
-                            if (avatarVoiceMap[avatar.avatar_id]) {
-                              setSelectedVoiceId(avatarVoiceMap[avatar.avatar_id]);
-                            }
+                            // Voice is selected independently via ElevenLabs dropdown — don't override
                           }}
                           className={cn(
                             "flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all text-center",
@@ -1422,9 +1419,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                           key={avatar.avatar_id}
                           onClick={() => {
                             setSelectedAvatarId(avatar.avatar_id);
-                            if (avatarVoiceMap[avatar.avatar_id]) {
-                              setSelectedVoiceId(avatarVoiceMap[avatar.avatar_id]);
-                            }
+                            // Voice is selected independently via ElevenLabs dropdown — don't override
                           }}
                           className={cn(
                             "flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all text-center",
