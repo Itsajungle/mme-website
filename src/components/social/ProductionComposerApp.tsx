@@ -164,8 +164,21 @@ function TimelineStrip({ clips, expandedClip, onToggle }: {
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
+  // ─── Persistence helpers ──────────────────────────────────────────────────
+  const storageKey = `mme-composer-${brand.slug}`;
+
+  function loadSavedState() {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(storageKey) : null;
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  }
+
+  const saved = useRef(loadSavedState());
+
   // Campaign brief
-  const [brief, setBrief] = useState<CampaignBrief>({ concept: "" });
+  const [brief, setBrief] = useState<CampaignBrief>(saved.current?.brief ?? { concept: "" });
 
   // Presenter / voice
   const [avatars, setAvatars] = useState<Avatar[]>([]);
@@ -185,24 +198,41 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [imageSource, setImageSource] = useState<ImageSource>("ai_generated");
 
   // Timeline clips
-  const [clips, setClips] = useState<TimelineClip[]>(DEFAULT_CLIPS);
+  const [clips, setClips] = useState<TimelineClip[]>(saved.current?.clips ?? DEFAULT_CLIPS);
   const [expandedClip, setExpandedClip] = useState<number | null>(null);
 
   // Script state
-  const [scriptGenerated, setScriptGenerated] = useState(false);
+  const [scriptGenerated, setScriptGenerated] = useState(saved.current?.scriptGenerated ?? false);
   const [scriptEditing, setScriptEditing] = useState(false);
 
   // Pipeline state
-  const [pipelineStage, setPipelineStage] = useState<PipelineStage>("idle");
-  const [pipelineProgress, setPipelineProgress] = useState(0);
-  const [presenterVideosReady, setPresenterVideosReady] = useState(false);
-  const [imageReady, setImageReady] = useState(false);
-  const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(null);
+  const [pipelineStage, setPipelineStage] = useState<PipelineStage>(saved.current?.pipelineStage === "complete" ? "complete" : "idle");
+  const [pipelineProgress, setPipelineProgress] = useState(saved.current?.pipelineStage === "complete" ? 100 : 0);
+  const [presenterVideosReady, setPresenterVideosReady] = useState(saved.current?.presenterVideosReady ?? false);
+  const [imageReady, setImageReady] = useState(saved.current?.imageReady ?? false);
+  const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(saved.current?.composedVideoUrl ?? null);
   const [renderId, setRenderId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(saved.current?.errorMessage ?? null);
 
   // Demo mode
-  const [demoMode, setDemoMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(saved.current?.demoMode ?? false);
+
+  // ─── Save state to localStorage on changes ─────────────────────────────
+  useEffect(() => {
+    const state = {
+      clips,
+      brief,
+      scriptGenerated,
+      pipelineStage,
+      presenterVideosReady,
+      imageReady,
+      composedVideoUrl,
+      demoMode,
+      errorMessage,
+      savedAt: Date.now(),
+    };
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
+  }, [clips, brief, scriptGenerated, pipelineStage, presenterVideosReady, imageReady, composedVideoUrl, demoMode, errorMessage, storageKey]);
 
   // Polling refs
   const pollingRef = useRef<Record<string, NodeJS.Timeout>>({});
@@ -729,6 +759,31 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           <h2 className="font-heading text-lg font-semibold text-text">Production Composer</h2>
           <p className="text-xs text-text-muted">{brand.name} — 7-Clip Video Ad</p>
         </div>
+
+        {/* Reset / New Production */}
+        {scriptGenerated && (
+          <button
+            onClick={() => {
+              setClips(DEFAULT_CLIPS);
+              setScriptGenerated(false);
+              setScriptEditing(false);
+              setPipelineStage("idle");
+              setPipelineProgress(0);
+              setPresenterVideosReady(false);
+              setImageReady(false);
+              setComposedVideoUrl(null);
+              setRenderId(null);
+              setErrorMessage(null);
+              setDemoMode(false);
+              setBrief({ concept: "" });
+              try { localStorage.removeItem(storageKey); } catch {}
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-mono transition-all border border-border bg-bg-deep text-text-muted hover:text-red-400 hover:border-red-400/50"
+          >
+            <RotateCcw size={10} />
+            New
+          </button>
+        )}
 
         {/* Demo mode toggle */}
         <button
