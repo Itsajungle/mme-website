@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
         "Content-Length": String(buffer.length),
         "Cache-Control": "public, max-age=3600",
         "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch {

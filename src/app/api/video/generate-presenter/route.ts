@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
+import { randomUUID } from "crypto";
 
 const DIMENSION_MAP: Record<string, { width: number; height: number }> = {
   "9:16": { width: 720, height: 1280 },
@@ -6,13 +9,15 @@ const DIMENSION_MAP: Record<string, { width: number; height: number }> = {
   "1:1": { width: 1080, height: 1080 },
 };
 
+const AUDIO_DIR = "/tmp/mme-audio";
+
 // ─── Generate speech audio via ElevenLabs ───────────────────────────────────
 // We use ElevenLabs for voice generation (Irish voices!) and HeyGen for
 // avatar lip-sync only. This gives us full control over voice selection.
 async function generateElevenLabsAudio(
   text: string,
   voiceId: string
-): Promise<string> {
+): Promise<Buffer> {
   const elApiKey = process.env.ELEVENLABS_API_KEY;
   if (!elApiKey) throw new Error("Voice engine not configured");
 
@@ -43,47 +48,33 @@ async function generateElevenLabsAudio(
     throw new Error(`Voice generation failed: ${response.status}`);
   }
 
-  // Convert audio to base64 data URL for HeyGen
   const audioBuffer = await response.arrayBuffer();
-  const base64 = Buffer.from(audioBuffer).toString("base64");
-  return `data:audio/mpeg;base64,${base64}`;
+  return Buffer.from(audioBuffer);
 }
 
-// ─── Upload audio to temporary hosting for HeyGen ───────────────────────────
-// HeyGen needs a publicly accessible URL. We'll use their asset upload API.
-async function uploadAudioToHeygen(
-  audioBase64DataUrl: string,
-  heygenApiKey: string
+// ─── Save audio locally and return a public URL ─────────────────────────────
+// We host the audio on our own server via /api/audio/serve so HeyGen can
+// fetch it for lip-sync. This avoids flaky HeyGen asset upload endpoints.
+async function saveAudioAndGetUrl(
+  audioBuffer: Buffer,
+  requestUrl: string
 ): Promise<string> {
-  // Extract raw base64 from data URL
-  const base64Data = audioBase64DataUrl.replace(/^data:audio\/\w+;base64,/, "");
-  const audioBuffer = Buffer.from(base64Data, "base64");
+  await mkdir(AUDIO_DIR, { recursive: true });
+  const filename = `presenter-${randomUUID()}.mp3`;
+  await writeFile(join(AUDIO_DIR, filename), audioBuffer);
 
-  // Upload via HeyGen's asset upload endpoint
-  const formData = new FormData();
-  const blob = new Blob([audioBuffer], { type: "audio/mpeg" });
-  formData.append("file", blob, "voice.mp3");
-
-  const uploadRes = await fetch("https://api.heygen.com/v1/asset", {
-    method: "POST",
-    headers: { "X-Api-Key": heygenApiKey },
-    body: formData,
-  });
-
-  if (!uploadRes.ok) {
-    const errText = await uploadRes.text();
-    console.error("[generate-presenter] HeyGen asset upload error:", uploadRes.status, errText);
-    throw new Error(`Audio upload failed: ${uploadRes.status}`);
+  // Build public URL — use APP_URL env var if set (for reverse proxy scenarios),
+  // otherwise derive from the incoming request
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  let origin: string;
+  if (appUrl) {
+    origin = appUrl.replace(/\/$/, "");
+  } else {
+    const url = new URL(requestUrl);
+    origin = `${url.protocol}//${url.host}`;
   }
-
-  const uploadData = await uploadRes.json();
-  const assetUrl = uploadData?.data?.url ?? uploadData?.data?.file_url;
-  if (!assetUrl) {
-    console.error("[generate-presenter] No URL in upload response:", JSON.stringify(uploadData));
-    throw new Error("No audio URL returned from asset upload");
-  }
-
-  return assetUrl;
+  console.log(`[generate-presenter] Audio serve origin: ${origin}`);
+  return `${origin}/api/audio/serve?file=${filename}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -117,13 +108,13 @@ export async function POST(req: NextRequest) {
     console.log(`[generate-presenter] Step 1: Generating ElevenLabs audio...`);
 
     // Step 1: Generate audio via ElevenLabs (Irish voice!)
-    const audioDataUrl = await generateElevenLabsAudio(scriptText, elVoiceId);
-    console.log(`[generate-presenter] Step 1 complete. Audio size: ${Math.round(audioDataUrl.length / 1024)}KB`);
+    const audioBuffer = await generateElevenLabsAudio(scriptText, elVoiceId);
+    console.log(`[generate-presenter] Step 1 complete. Audio size: ${Math.round(audioBuffer.length / 1024)}KB`);
 
-    // Step 2: Upload audio to HeyGen assets
-    console.log(`[generate-presenter] Step 2: Uploading audio to HeyGen...`);
-    const audioUrl = await uploadAudioToHeygen(audioDataUrl, apiKey);
-    console.log(`[generate-presenter] Step 2 complete. Audio URL: ${audioUrl.slice(0, 80)}...`);
+    // Step 2: Save audio locally and get a public URL for HeyGen
+    console.log(`[generate-presenter] Step 2: Saving audio for presenter engine...`);
+    const audioUrl = await saveAudioAndGetUrl(audioBuffer, req.url);
+    console.log(`[generate-presenter] Step 2 complete. Audio URL: ${audioUrl}`);
 
     // Step 3: Generate avatar video with lip-sync to our audio
     console.log(`[generate-presenter] Step 3: Generating avatar video with lip-sync...`);
