@@ -827,6 +827,75 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             </div>
           </div>
 
+          {/* ─── Script Preview / Edit Panel ─── */}
+          {scriptGenerated && (
+            <div className="p-6 border-t border-border/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono flex items-center gap-1.5">
+                  <FileText size={10} />
+                  Full Script — {clips.filter(c => c.script).length} spoken clips
+                </label>
+                <button
+                  onClick={() => setScriptEditing(!scriptEditing)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-medium text-text-muted hover:text-text transition-colors border border-border hover:border-accent/30"
+                >
+                  {scriptEditing ? <Eye size={10} /> : <Pencil size={10} />}
+                  {scriptEditing ? "Lock Script" : "Edit Script"}
+                </button>
+              </div>
+              <div className="rounded-lg border border-border bg-black/20 max-h-[320px] overflow-y-auto divide-y divide-border/30">
+                {clips.map((clip) => {
+                  const typeConfig = CLIP_TYPE_CONFIG[clip.type];
+                  const hasSpokenContent = clip.script || clip.type === "presenter" || clip.type === "image_overlay";
+                  return (
+                    <div key={clip.clipNumber} className="px-4 py-3 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold", typeConfig.bgColor, typeConfig.color)}>
+                          {clip.clipNumber}
+                        </div>
+                        <span className="text-[11px] text-text font-medium">{clip.label}</span>
+                        <span className="text-[10px] text-text-muted">{clip.duration}s</span>
+                        {clip.type.startsWith("remotion") && (
+                          <span className="text-[9px] text-red-400/60 font-mono ml-auto">Motion graphic</span>
+                        )}
+                      </div>
+                      {clip.script ? (
+                        scriptEditing ? (
+                          <textarea
+                            value={clip.script}
+                            onChange={(e) => updateClip(clip.clipNumber, { script: e.target.value })}
+                            className="w-full bg-black/30 border border-border/50 rounded p-2 text-xs text-text resize-none focus:outline-none focus:border-accent/50 leading-relaxed"
+                            rows={Math.max(2, Math.ceil(clip.script.length / 80))}
+                          />
+                        ) : (
+                          <p className="text-[11px] text-text/80 leading-relaxed border-l-2 border-accent/20 pl-3 italic">
+                            &ldquo;{clip.script}&rdquo;
+                          </p>
+                        )
+                      ) : clip.notes ? (
+                        <p className="text-[10px] text-text-muted italic">{clip.notes}</p>
+                      ) : clip.offerData ? (
+                        <div className="text-[10px] text-text-muted">
+                          {clip.offerData.headline} — {clip.offerData.price} | {clip.offerData.finance}
+                        </div>
+                      ) : null}
+                      {clip.direction && (
+                        <p className="text-[9px] text-blue-400/60 font-mono">
+                          Direction: {clip.direction}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {scriptEditing && (
+                <p className="text-[9px] text-amber-400/60 font-mono text-center">
+                  Editing mode — changes are saved automatically. Click &quot;Lock Script&quot; when done.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* 7-Clip Timeline */}
           <div className="p-6 space-y-4">
             <div className="flex items-center justify-between">
