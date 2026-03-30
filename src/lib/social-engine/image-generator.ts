@@ -1,41 +1,41 @@
 // Image generator — AI image generation with primary and fallback providers
-// Primary: Gemini Image Generation. Fallback: DALL-E 3 via OpenAI.
+// Primary: Gemini 3 Pro Image Preview. Fallback: DALL-E 3 via OpenAI.
 
 import fs from "fs";
 import path from "path";
 import type { ImageGenerationRequest, GeneratedImage } from "./types";
 
 // ─── Platform aspect ratios ─────────────────────────────────────────────────
-type GeminiImageSize = "landscape_16_9" | "square" | "portrait_4_3";
+type GeminiAspectRatio = "1:1" | "4:5" | "16:9" | "9:16";
 type DallESize = "1024x1024" | "1024x1792" | "1792x1024";
 
 interface PlatformSizeConfig {
-  gemini: GeminiImageSize;
+  gemini: GeminiAspectRatio;
   dalle: DallESize;
 }
 
 const PLATFORM_SIZES: Record<string, PlatformSizeConfig> = {
-  "instagram-feed": { gemini: "square", dalle: "1024x1024" },
-  "instagram-stories": { gemini: "portrait_4_3", dalle: "1024x1792" },
-  "instagram-reels": { gemini: "portrait_4_3", dalle: "1024x1792" },
-  instagram: { gemini: "square", dalle: "1024x1024" },
-  linkedin: { gemini: "landscape_16_9", dalle: "1792x1024" },
-  x: { gemini: "landscape_16_9", dalle: "1792x1024" },
-  twitter: { gemini: "landscape_16_9", dalle: "1792x1024" },
-  facebook: { gemini: "landscape_16_9", dalle: "1792x1024" },
-  tiktok: { gemini: "portrait_4_3", dalle: "1024x1792" },
+  "instagram-feed": { gemini: "1:1", dalle: "1024x1024" },
+  "instagram-stories": { gemini: "9:16", dalle: "1024x1792" },
+  "instagram-reels": { gemini: "9:16", dalle: "1024x1792" },
+  instagram: { gemini: "1:1", dalle: "1024x1024" },
+  linkedin: { gemini: "16:9", dalle: "1792x1024" },
+  x: { gemini: "16:9", dalle: "1792x1024" },
+  twitter: { gemini: "16:9", dalle: "1792x1024" },
+  facebook: { gemini: "16:9", dalle: "1792x1024" },
+  tiktok: { gemini: "9:16", dalle: "1024x1792" },
 };
 
 function getSizeConfig(platform: string): PlatformSizeConfig {
   const key = platform.toLowerCase();
-  return PLATFORM_SIZES[key] ?? { gemini: "landscape_16_9", dalle: "1792x1024" };
+  return PLATFORM_SIZES[key] ?? { gemini: "16:9", dalle: "1792x1024" };
 }
 
 // ─── Prompt enhancement ───────────────────────────────────────────────────────
 function enhancePrompt(prompt: string, brandSector?: string, brandTone?: string): string {
   const sector = brandSector ?? "business";
   const tone = brandTone ?? "professional";
-  return `${prompt}. Professional quality, clean composition, suitable for ${sector} business, ${tone} aesthetic. No text overlays unless specified.`;
+  return `${prompt}. Photorealistic, high quality, professional photography, clean composition, suitable for ${sector} business, ${tone} aesthetic.`;
 }
 
 // ─── Image download and save ─────────────────────────────────────────────
@@ -47,8 +47,8 @@ function ensureGeneratedDir(): void {
   }
 }
 
-// ─── Primary: Gemini Image Generation ────────────────────────────────────────
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
+// ─── Primary: Gemini 3 Pro Image Preview ─────────────────────────────────────
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent";
 
 interface GeminiImageResponse {
   candidates?: {
@@ -65,23 +65,23 @@ async function generateWithGemini(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
 
-  const aspectHint = sizeConfig.gemini === "square"
-    ? "Square format (1:1 aspect ratio)."
-    : sizeConfig.gemini === "portrait_4_3"
-    ? "Portrait format (3:4 aspect ratio)."
-    : "Landscape format (16:9 aspect ratio).";
-
   const body = {
-    contents: [{ parts: [{ text: `${prompt} ${aspectHint}` }] }],
+    contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      responseMimeType: "text/plain",
+      imageConfig: {
+        aspectRatio: sizeConfig.gemini,
+        imageSize: "2K",
+      },
     },
   };
 
-  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+  const res = await fetch(GEMINI_ENDPOINT, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
     body: JSON.stringify(body),
   });
 
