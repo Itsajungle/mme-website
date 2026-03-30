@@ -171,7 +171,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("");
   const [avatarsLoading, setAvatarsLoading] = useState(false);
-  const [voices, setVoices] = useState<{ voiceId: string; name: string; accent?: string }[]>([]);
+  const [voices, setVoices] = useState<{ id: string; voiceId?: string; name: string; accent?: string }[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState(brand.audioBrandKit.voiceId);
   const [voicesLoading, setVoicesLoading] = useState(false);
 
@@ -1226,7 +1226,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               >
                 {voices.length > 0 ? (
                   voices.map((v) => (
-                    <option key={v.voiceId} value={v.voiceId}>
+                    <option key={v.id} value={v.id}>
                       {v.name} {v.accent ? `(${v.accent})` : ""}
                     </option>
                   ))
