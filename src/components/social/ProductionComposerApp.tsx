@@ -528,13 +528,83 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       setImageReady(true);
       setPipelineProgress(70);
 
+      // Mark Remotion clips as ready (they'll be composed in the next step)
+      updateClip(1, { status: "complete" });
+      updateClip(5, { status: "complete" });
+      updateClip(7, { status: "complete" });
+
+      // Stop here — presenter clips are ready. User clicks "Compose Final Video" for next step.
+      setPipelineStage("idle");
+      setPipelineProgress(100);
+    } catch (err) {
+      console.error("[produce-video]", err);
+      const msg = err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : typeof err === "object" && err !== null
+            ? JSON.stringify(err)
+            : "Production failed — check console for details";
+      setErrorMessage(msg);
+      setPipelineStage("error");
+    }
+  };
+
+  // ─── Compose Final Video (Remotion only — no presenter regeneration) ────
+
+  const handleComposeVideo = async () => {
+    setErrorMessage(null);
+    setComposedVideoUrl(null);
+    setRenderId(null);
+
+    try {
+      // Stage 3: Clip 3 Image (if not already done)
+      const clip3 = clips.find((c) => c.clipNumber === 3);
+      let clip3ImageUrl = clip3?.imageUrl ?? "";
+
+      if (clip3 && !clip3ImageUrl) {
+        setPipelineStage("images");
+        setPipelineProgress(60);
+        updateClip(3, { status: "generating" });
+
+        if (imageSource === "ai_generated" && clip3.imagePrompt) {
+          try {
+            const res = await fetch("/api/social/generate-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: clip3.imagePrompt,
+                platform: "instagram",
+                brandSlug: brand.slug,
+                aspectRatio: aspectRatio === "9:16" ? "portrait" : aspectRatio === "1:1" ? "square" : "landscape",
+              }),
+            });
+            const data = await res.json();
+            clip3ImageUrl = data?.url ?? "";
+          } catch {
+            clip3ImageUrl = `/brands/tadg-riordan/${brief.location === "Tallaght Garage" ? "tallaght-garage.webp" : "ashbourne-garage.webp"}`;
+          }
+        } else {
+          clip3ImageUrl = `/brands/tadg-riordan/${brief.location === "Tallaght Garage" ? "tallaght-garage.webp" : "ashbourne-garage.webp"}`;
+        }
+
+        updateClip(3, { status: "complete", imageUrl: clip3ImageUrl });
+        setImageReady(true);
+      }
+
       // Stage 4: Composition
       setPipelineStage("composition");
+      setPipelineProgress(70);
       updateClip(1, { status: "complete" });
       updateClip(5, { status: "complete" });
       updateClip(7, { status: "complete" });
 
       const logoUrl = "/brands/tadg-riordan/logo-dark.png";
+
+      // Gather presenter video URLs from existing clips
+      const presenterResults = clips
+        .filter((c) => c.type === "presenter" && c.status === "complete" && c.videoUrl)
+        .map((c) => ({ clipNumber: c.clipNumber, videoUrl: c.videoUrl ?? "" }));
 
       // Build segments
       const segments: RenderSegment[] = [];
@@ -556,7 +626,6 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             duration: clip.duration,
           });
 
-          // Add lower third overlay
           if (lowerThird.name) {
             const startTime = getClipStartTime(clips, clips.indexOf(clip)) + 2;
             overlays.push({
@@ -568,9 +637,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             });
           }
         } else if (clip.type === "image_overlay") {
-          // Clip 3 — the presenter video continues underneath, with image overlay
           const clip3Presenter = presenterResults.find((r) => r.clipNumber === 3);
-          // Use clip 2's continued video, or a separate generation
           segments.push({
             type: "heygen",
             videoUrl: clip3Presenter?.videoUrl ?? presenterResults[0]?.videoUrl ?? "",
@@ -658,14 +725,14 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       setPipelineStage("complete");
       setPipelineProgress(100);
     } catch (err) {
-      console.error("[produce-video]", err);
+      console.error("[compose-video]", err);
       const msg = err instanceof Error
         ? err.message
         : typeof err === "string"
           ? err
           : typeof err === "object" && err !== null
             ? JSON.stringify(err)
-            : "Production failed — check console for details";
+            : "Composition failed — check console for details";
       setErrorMessage(msg);
       setPipelineStage("error");
     }
@@ -1125,6 +1192,99 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                             {clip.error && (
                               <p className="text-[10px] text-red-400">{clip.error}</p>
                             )}
+
+                            {/* Remotion clip preview — Logo Intro */}
+                            {clip.type === "remotion_intro" && (
+                              <div className="rounded-lg border border-red-400/20 bg-gradient-to-br from-red-900/20 to-bg-deep overflow-hidden">
+                                <div className="aspect-video flex items-center justify-center relative">
+                                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(227,30,36,0.15),transparent_70%)]" />
+                                  <div className="flex flex-col items-center gap-2 z-10">
+                                    <div className="w-16 h-16 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
+                                      <Film size={24} className="text-red-400" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-white/90">{brand.name}</span>
+                                    {brand.logoLine && (
+                                      <span className="text-[10px] text-white/50 italic">{brand.logoLine}</span>
+                                    )}
+                                  </div>
+                                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/50 text-[9px] font-mono text-white/60">
+                                    {clip.duration}s — Logo Reveal
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Remotion clip preview — Offer Card */}
+                            {clip.type === "remotion_offer" && clip.offerData && (
+                              <div className="rounded-lg border border-red-400/20 bg-gradient-to-br from-red-900/30 to-bg-deep overflow-hidden">
+                                <div className="aspect-video flex items-center justify-center relative p-4">
+                                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(227,30,36,0.2),transparent_70%)]" />
+                                  <div className="flex flex-col items-center gap-1 z-10 text-center">
+                                    {clip.offerData.price && (
+                                      <span className="text-2xl font-bold text-white">{clip.offerData.price}</span>
+                                    )}
+                                    {clip.offerData.headline && (
+                                      <span className="text-xs font-medium text-white/80">{clip.offerData.headline}</span>
+                                    )}
+                                    {clip.offerData.finance && (
+                                      <span className="text-[10px] text-accent">{clip.offerData.finance}</span>
+                                    )}
+                                    {clip.offerData.terms && (
+                                      <span className="text-[9px] text-white/40 mt-1">{clip.offerData.terms}</span>
+                                    )}
+                                  </div>
+                                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/50 text-[9px] font-mono text-white/60">
+                                    {clip.duration}s — Offer Card
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Remotion clip preview — Brand Outro */}
+                            {clip.type === "remotion_outro" && (
+                              <div className="rounded-lg border border-red-400/20 bg-gradient-to-br from-red-900/20 to-bg-deep overflow-hidden">
+                                <div className="aspect-video flex items-center justify-center relative">
+                                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(227,30,36,0.1),transparent_70%)]" />
+                                  <div className="flex flex-col items-center gap-2 z-10">
+                                    <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
+                                      <Film size={18} className="text-red-400" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-white/80">{brand.name}</span>
+                                    <span className="text-[10px] text-white/40">End Card</span>
+                                  </div>
+                                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/50 text-[9px] font-mono text-white/60">
+                                    {clip.duration}s — Outro
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Image preview for showcase clip */}
+                            {clip.type === "image_overlay" && clip.imageUrl && (
+                              <div className="rounded-lg border border-emerald-400/20 overflow-hidden">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={clip.imageUrl}
+                                  alt="Product showcase"
+                                  className="w-full aspect-video object-cover"
+                                />
+                                <div className="px-2 py-1 bg-black/40 text-[9px] font-mono text-emerald-400/70 text-right">
+                                  {clip.duration}s — Product Showcase
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Presenter video preview */}
+                            {clip.type === "presenter" && clip.status === "complete" && clip.videoUrl && (
+                              <div className="rounded-lg border border-blue-400/20 overflow-hidden">
+                                <video
+                                  src={clip.videoUrl}
+                                  controls
+                                  className="w-full"
+                                  style={{ maxHeight: "200px" }}
+                                />
+                              </div>
+                            )}
                           </div>
                         </motion.div>
                       )}
@@ -1449,29 +1609,80 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               </div>
             )}
 
-            {/* Produce Video button */}
-            <button
-              onClick={handleProduceVideo}
-              disabled={!scriptGenerated || isProducing}
-              className={cn(
-                "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors",
-                scriptGenerated && !isProducing
-                  ? "bg-accent text-bg hover:bg-accent/90"
-                  : "bg-white/5 text-text-muted cursor-not-allowed"
-              )}
-            >
-              {isProducing ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Producing...
-                </>
-              ) : (
-                <>
-                  <Clapperboard size={14} />
-                  Produce Video
-                </>
-              )}
-            </button>
+            {/* ── Action Buttons ─────────────────────────────── */}
+
+            {/* Step 1: Generate Presenter Clips (only when clips don't have videos yet) */}
+            {!presenterVideosReady && (
+              <button
+                onClick={handleProduceVideo}
+                disabled={!scriptGenerated || isProducing}
+                className={cn(
+                  "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors",
+                  scriptGenerated && !isProducing
+                    ? "bg-accent text-bg hover:bg-accent/90"
+                    : "bg-white/5 text-text-muted cursor-not-allowed"
+                )}
+              >
+                {isProducing && pipelineStage === "presenter_videos" ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Generating Presenter Clips...
+                  </>
+                ) : isProducing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Producing...
+                  </>
+                ) : (
+                  <>
+                    <Clapperboard size={14} />
+                    Produce Video
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Step 2: Compose Final Video (only when presenter clips are ready) */}
+            {presenterVideosReady && !composedVideoUrl && (
+              <button
+                onClick={handleComposeVideo}
+                disabled={isProducing}
+                className={cn(
+                  "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors",
+                  !isProducing
+                    ? "bg-gradient-to-r from-accent to-emerald-400 text-bg hover:opacity-90"
+                    : "bg-white/5 text-text-muted cursor-not-allowed"
+                )}
+              >
+                {isProducing && pipelineStage === "composition" ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Composing Final Video...
+                  </>
+                ) : isProducing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Film size={14} />
+                    Compose Final Video
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Regenerate Presenter Clips (when already done, in case user wants to redo) */}
+            {presenterVideosReady && !isProducing && (
+              <button
+                onClick={handleProduceVideo}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors border border-border bg-bg-deep text-text-muted hover:text-yellow-400 hover:border-yellow-400/50"
+              >
+                <RotateCcw size={12} />
+                Regenerate Presenter Clips
+              </button>
+            )}
 
             {/* Download button */}
             {composedVideoUrl && (
