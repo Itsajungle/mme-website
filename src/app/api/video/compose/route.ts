@@ -15,10 +15,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const payload = { segments, overlays, platform, aspectRatio };
+    console.log("[compose] Sending to render server:", JSON.stringify(payload).slice(0, 2000));
+
     const response = await fetch(`${RENDER_SERVER_URL}/render`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ segments, overlays, platform, aspectRatio }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(30000),
     });
 
@@ -26,12 +29,13 @@ export async function POST(req: NextRequest) {
       const text = await response.text();
       console.error("[compose] Render server error:", response.status, text);
       return NextResponse.json(
-        { error: `Render server error: ${response.status}` },
+        { error: `Render server error (${response.status}): ${text.slice(0, 500)}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
+    console.log("[compose] Render server response:", JSON.stringify(data));
     return NextResponse.json({
       renderId: data.renderId ?? data.id,
       status: "rendering",

@@ -604,7 +604,14 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       // Gather presenter video URLs from existing clips
       const presenterResults = clips
         .filter((c) => c.type === "presenter" && c.status === "complete" && c.videoUrl)
-        .map((c) => ({ clipNumber: c.clipNumber, videoUrl: c.videoUrl ?? "" }));
+        .map((c) => ({ clipNumber: c.clipNumber, videoUrl: c.videoUrl! }));
+
+      console.log("[compose-video] Presenter results:", JSON.stringify(presenterResults));
+
+      // Validate: we need at least one presenter video to compose
+      if (presenterResults.length === 0) {
+        throw new Error("No presenter videos available — please generate presenter clips first");
+      }
 
       // Build segments
       const segments: RenderSegment[] = [];
@@ -620,9 +627,11 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           });
         } else if (clip.type === "presenter") {
           const result = presenterResults.find((r) => r.clipNumber === clip.clipNumber);
+          // If this specific presenter clip has no video, use the closest available one
+          const videoUrl = result?.videoUrl || presenterResults[0].videoUrl;
           segments.push({
             type: "heygen",
-            videoUrl: result?.videoUrl ?? "",
+            videoUrl,
             duration: clip.duration,
           });
 
@@ -638,9 +647,10 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           }
         } else if (clip.type === "image_overlay") {
           const clip3Presenter = presenterResults.find((r) => r.clipNumber === 3);
+          const videoUrl = clip3Presenter?.videoUrl || presenterResults[0].videoUrl;
           segments.push({
             type: "heygen",
-            videoUrl: clip3Presenter?.videoUrl ?? presenterResults[0]?.videoUrl ?? "",
+            videoUrl,
             duration: clip.duration,
           });
           overlays.push({
@@ -672,7 +682,17 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         }
       }
 
+      console.log("[compose-video] Segments:", JSON.stringify(segments));
+      console.log("[compose-video] Overlays:", JSON.stringify(overlays));
+
+      // Final validation: ensure no heygen segment has an empty videoUrl
+      const invalidSegments = segments.filter((s) => s.type === "heygen" && !s.videoUrl);
+      if (invalidSegments.length > 0) {
+        throw new Error(`${invalidSegments.length} video segment(s) have no video URL — presenter videos may not have completed`);
+      }
+
       // Submit composition
+      console.log("[compose-video] Submitting to /api/video/compose...");
       const composeRes = await fetch("/api/video/compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -682,11 +702,19 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       if (!composeRes.ok) {
         const errData = await composeRes.json().catch(() => ({}));
         const errMsg = typeof errData?.error === "string" ? errData.error : JSON.stringify(errData?.error ?? `Status ${composeRes.status}`);
+        console.error("[compose-video] Compose API error:", composeRes.status, errMsg);
         throw new Error(errMsg || "Composition failed");
       }
 
       const composeData = await composeRes.json();
       const newRenderId = composeData.renderId;
+      console.log("[compose-video] Render started, renderId:", newRenderId);
+
+      if (!newRenderId) {
+        console.error("[compose-video] No renderId in response:", JSON.stringify(composeData));
+        throw new Error("Render server did not return a render ID");
+      }
+
       setRenderId(newRenderId);
       setPipelineProgress(80);
 
@@ -698,17 +726,21 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
           try {
             const res = await fetch(`/api/video/compose-status?renderId=${newRenderId}`);
             const data = await res.json();
+            console.log(`[compose-video] Poll #${attempts}:`, data.status, `progress=${data.progress ?? 0}`);
             setPipelineProgress(80 + Math.min(data.progress ?? 0, 100) * 0.2);
 
             if (data.status === "completed") {
               clearInterval(interval);
               composePollingRef.current = null;
-              setComposedVideoUrl(data.outputUrl ?? `/api/video/compose-download?renderId=${newRenderId}`);
+              const outputUrl = data.outputUrl ?? `/api/video/compose-download?renderId=${newRenderId}`;
+              console.log("[compose-video] Complete! Output:", outputUrl);
+              setComposedVideoUrl(outputUrl);
               resolve();
             } else if (data.status === "failed" || attempts >= 60) {
               clearInterval(interval);
               composePollingRef.current = null;
               const errMsg = typeof data.error === "string" ? data.error : JSON.stringify(data.error ?? "Composition timed out");
+              console.error("[compose-video] Failed:", errMsg);
               reject(new Error(errMsg));
             }
           } catch {

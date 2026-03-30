@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await response.json();
+    console.log("[compose-status] Render server status:", JSON.stringify(data));
     return NextResponse.json({
       status: data.status ?? "rendering",
       progress: data.progress ?? 0,
