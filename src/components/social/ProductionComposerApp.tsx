@@ -617,39 +617,75 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         throw new Error("No presenter videos available — please generate presenter clips first");
       }
 
-      // Build segments — single presenter clip with optional overlays
+      // Build segments — logo intro, single presenter clip with overlays, logo outro
       const segments: RenderSegment[] = [];
       const overlays: RenderOverlay[] = [];
+      const offerClip = clips.find((c) => c.type === "remotion_offer");
 
-      // Use the first available presenter clip — one continuous narration, no pauses
+      // 1. Logo intro (3s brand sting)
+      segments.push({
+        type: "remotion",
+        template: "LogoReveal",
+        duration: 3,
+        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#00FF96", tagline: brand.logoLine, platform: "instagram" },
+      });
+
+      let runningTime = 3;
+
+      // 2. Single presenter clip — continuous narration
       const pres1 = presenterResults[0];
       const pres1Clip = clips.find((c) => c.type === "presenter" && c.status === "complete" && c.clipNumber === pres1.clipNumber);
       const clipDur = pres1Clip?.duration ?? 15;
-
-      // Single presenter video as the entire base
       segments.push({ type: "heygen", videoUrl: pres1.videoUrl, duration: clipDur });
 
-      // LowerThird overlay — appears 2s in, lasts 5s
+      // LowerThird overlay — appears 2s into presenter clip, lasts 5s
       if (lowerThird.name) {
         overlays.push({
           template: "LowerThird",
-          startTime: 2,
+          startTime: runningTime + 2,
           duration: 5,
           mode: "overlay",
           props: { name: lowerThird.name, title: lowerThird.title },
         });
       }
 
-      // ProductShowcase overlay — appears halfway through, OVERLAY mode so narration continues
+      // ProductShowcase overlay — appears 1/3 through, overlay mode so narration continues
       if (clip3ImageUrl) {
         overlays.push({
           template: "ProductShowcase",
-          startTime: Math.floor(clipDur / 2),
-          duration: Math.min(5, Math.ceil(clipDur / 3)),
+          startTime: runningTime + Math.floor(clipDur / 3),
+          duration: Math.min(5, Math.ceil(clipDur / 4)),
           mode: "overlay",
           props: { imageUrl: toAbsolute(clip3ImageUrl) },
         });
       }
+
+      // StatCard overlay — appears 2/3 through if offer data exists
+      if (offerClip?.offerData) {
+        overlays.push({
+          template: "StatCard",
+          startTime: runningTime + Math.floor((clipDur * 2) / 3),
+          duration: Math.min(5, Math.ceil(clipDur / 4)),
+          mode: "overlay",
+          props: {
+            statNumber: offerClip.offerData.price ?? "",
+            statLabel: offerClip.offerData.headline ?? "",
+            subtitle: [offerClip.offerData.finance, offerClip.offerData.terms].filter(Boolean).join(" | "),
+            brandColor: "#E31E24",
+            platform: "instagram",
+          },
+        });
+      }
+
+      runningTime += clipDur;
+
+      // 3. Logo outro (3s brand sting)
+      segments.push({
+        type: "remotion",
+        template: "LogoReveal",
+        duration: 3,
+        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#00FF96", tagline: brand.logoLine, platform: "instagram" },
+      });
 
       console.log("[compose-video] Segments:", JSON.stringify(segments));
       console.log("[compose-video] Overlays:", JSON.stringify(overlays));
