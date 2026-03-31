@@ -1641,40 +1641,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             )}
           </div>
 
-          {/* Video Preview */}
           <div className="p-6 space-y-3">
-            <label className="text-[10px] uppercase tracking-wider text-text-muted font-mono">Preview</label>
-
-            {/* Final composed video or producing spinner */}
-            <div className={cn(
-              "rounded-lg border border-border bg-bg-deep flex items-center justify-center relative overflow-hidden",
-              aspectRatio === "9:16" ? "aspect-[9/16] max-h-64" : aspectRatio === "1:1" ? "aspect-square" : "aspect-video"
-            )}>
-              {isProducing ? (
-                <motion.div className="flex flex-col items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <Loader2 size={24} className="text-accent animate-spin" />
-                  <span className="text-xs text-accent font-mono">Producing...</span>
-                </motion.div>
-              ) : pipelineStage === "complete" || presenterVideosReady ? (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center">
-                    <Check size={20} className="text-accent" />
-                  </div>
-                  <span className="text-xs text-accent font-semibold">Presenter videos generated</span>
-                  <span className="text-[10px] text-text-muted">Watch individual clips below</span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-text-muted">
-                  <Film size={24} />
-                  <span className="text-xs">Generate a script, then produce</span>
-                </div>
-              )}
-
-              <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[10px] font-mono text-white/70">
-                {formatDuration(totalDuration)}
-              </div>
-            </div>
-
             {/* Individual presenter clip videos */}
             {clips.some((c) => c.type === "presenter" && c.status === "complete" && c.videoUrl) && (
               <div className="space-y-2">
