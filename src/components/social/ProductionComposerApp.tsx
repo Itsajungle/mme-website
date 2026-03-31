@@ -617,104 +617,39 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         throw new Error("No presenter videos available — please generate presenter clips first");
       }
 
-      // Build segments — presenter clips are the base, image/card are OVERLAYS on them
+      // Build segments — single presenter clip with optional overlays
       const segments: RenderSegment[] = [];
       const overlays: RenderOverlay[] = [];
-      const presenterClips = clips.filter((c) => c.type === "presenter" && c.status === "complete");
-      const offerClip = clips.find((c) => c.type === "remotion_offer");
 
-      // 1. Logo intro (brief brand sting, 2s)
-      segments.push({
-        type: "remotion",
-        template: "LogoReveal",
-        duration: 2,
-        props: { logoUrl, logoColor: "#E31E24", tagline: brand.logoLine, backgroundColor: "#E31E24" },
-      });
+      // Use the first available presenter clip — one continuous narration, no pauses
+      const pres1 = presenterResults[0];
+      const pres1Clip = clips.find((c) => c.type === "presenter" && c.status === "complete" && c.clipNumber === pres1.clipNumber);
+      const clipDur = pres1Clip?.duration ?? 15;
 
-      let runningTime = 2; // seconds after logo intro
+      // Single presenter video as the entire base
+      segments.push({ type: "heygen", videoUrl: pres1.videoUrl, duration: clipDur });
 
-      // 2. First presenter clip — with LowerThird + ProductShowcase overlay
-      const pres1 = presenterResults.find((r) => r.clipNumber === presenterClips[0]?.clipNumber);
-      if (pres1) {
-        const clipDur = presenterClips[0].duration;
-        segments.push({ type: "heygen", videoUrl: pres1.videoUrl, duration: clipDur });
-        if (lowerThird.name) {
-          overlays.push({
-            template: "LowerThird",
-            startTime: runningTime + 2,
-            duration: 5,
-            mode: "overlay",
-            props: { name: lowerThird.name, title: lowerThird.title },
-          });
-        }
-        if (clip3ImageUrl) {
-          overlays.push({
-            template: "ProductShowcase",
-            startTime: runningTime + Math.floor(clipDur / 2),
-            duration: Math.ceil(clipDur / 2),
-            mode: "fullscreen",
-            props: { imageUrl: toAbsolute(clip3ImageUrl) },
-          });
-        }
-        runningTime += clipDur;
+      // LowerThird overlay — appears 2s in, lasts 5s
+      if (lowerThird.name) {
+        overlays.push({
+          template: "LowerThird",
+          startTime: 2,
+          duration: 5,
+          mode: "overlay",
+          props: { name: lowerThird.name, title: lowerThird.title },
+        });
       }
 
-      // 3. Second presenter clip — with LowerThird + StatCard overlay
-      const pres2 = presenterResults.find((r) => r.clipNumber === presenterClips[1]?.clipNumber);
-      if (pres2) {
-        const clipDur = presenterClips[1].duration;
-        segments.push({ type: "heygen", videoUrl: pres2.videoUrl, duration: clipDur });
-        if (lowerThird.name) {
-          overlays.push({
-            template: "LowerThird",
-            startTime: runningTime + 2,
-            duration: 5,
-            mode: "overlay",
-            props: { name: lowerThird.name, title: lowerThird.title },
-          });
-        }
-        if (offerClip?.offerData) {
-          overlays.push({
-            template: "StatCard",
-            startTime: runningTime + Math.floor(clipDur / 2),
-            duration: Math.ceil(clipDur / 2),
-            mode: "fullscreen",
-            props: {
-              statNumber: offerClip.offerData.price ?? "",
-              statLabel: offerClip.offerData.headline ?? "",
-              subtitle: [offerClip.offerData.finance, offerClip.offerData.terms].filter(Boolean).join(" | "),
-              brandColor: "#E31E24",
-              platform: "instagram",
-            },
-          });
-        }
-        runningTime += clipDur;
+      // ProductShowcase overlay — appears halfway through, OVERLAY mode so narration continues
+      if (clip3ImageUrl) {
+        overlays.push({
+          template: "ProductShowcase",
+          startTime: Math.floor(clipDur / 2),
+          duration: Math.min(5, Math.ceil(clipDur / 3)),
+          mode: "overlay",
+          props: { imageUrl: toAbsolute(clip3ImageUrl) },
+        });
       }
-
-      // 4. Third presenter clip — with LowerThird
-      const pres3 = presenterResults.find((r) => r.clipNumber === presenterClips[2]?.clipNumber);
-      if (pres3) {
-        const clipDur = presenterClips[2].duration;
-        segments.push({ type: "heygen", videoUrl: pres3.videoUrl, duration: clipDur });
-        if (lowerThird.name) {
-          overlays.push({
-            template: "LowerThird",
-            startTime: runningTime + 2,
-            duration: 5,
-            mode: "overlay",
-            props: { name: lowerThird.name, title: lowerThird.title },
-          });
-        }
-        runningTime += clipDur;
-      }
-
-      // 5. Logo outro (brief brand sting, 2s)
-      segments.push({
-        type: "remotion",
-        template: "LogoReveal",
-        duration: 2,
-        props: { logoUrl, logoColor: "#E31E24", variant: "outro" },
-      });
 
       console.log("[compose-video] Segments:", JSON.stringify(segments));
       console.log("[compose-video] Overlays:", JSON.stringify(overlays));
