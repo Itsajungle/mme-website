@@ -56,9 +56,9 @@ export function VoiceBank({
 
   // Voice settings
   const [settings, setSettings] = useState<Partial<VoiceSettings>>({
-    stability: 0.5,
-    similarityBoost: 0.8,
-    style: 0.3,
+    stability: 0.75,
+    similarityBoost: 0.95,
+    style: 0.05,
     useSpeakerBoost: true,
     speed: 1.0,
   });

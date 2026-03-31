@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Play, RotateCcw, Download, Palette, Sparkles, Zap } from "lucide-react";
 
-const GRID_SIZE = 50;
+const GRID_SIZE = 30;
 
 interface FragmentAnimatorProps {
   logoUrl?: string;
@@ -208,6 +208,7 @@ export default function FragmentAnimator({
     const p = progressRef.current;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
+    const { scaledW, scaledH, offsetX: logoOX, offsetY: logoOY } = calcLogoTransform(image);
     fragmentsRef.current.forEach((frag) => {
       ctx.save();
       ctx.translate(frag.x, frag.y);
@@ -220,14 +221,9 @@ export default function FragmentAnimator({
       ctx.beginPath();
       ctx.arc(0, 0, frag.radius, 0, Math.PI * 2);
       ctx.clip();
-      // Map fragment source coords back to original image space for sampling
-      const { scale, offsetX, offsetY } = calcLogoTransform(image);
-      const origSrcX = (frag.sourceX - offsetX) / scale;
-      const origSrcY = (frag.sourceY - offsetY) / scale;
-      const origRadius = frag.radius / scale;
       ctx.drawImage(image,
-        origSrcX - origRadius, origSrcY - origRadius, origRadius * 2, origRadius * 2,
-        -frag.radius, -frag.radius, frag.radius * 2, frag.radius * 2);
+        0, 0, image.width, image.height,
+        -(frag.sourceX - logoOX), -(frag.sourceY - logoOY), scaledW, scaledH);
       ctx.restore();
     });
   }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor, targetAspectRatio]);
@@ -239,8 +235,6 @@ export default function FragmentAnimator({
   const animate = useCallback(() => {
     if (!isAnimating || !image) return;
     let totalDist = 0, maxDist = 0;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
     fragmentsRef.current.forEach((frag) => {
       const dx = frag.targetX - frag.x, dy = frag.targetY - frag.y, dr = frag.targetRotation - frag.rotation;
       const dist = Math.sqrt(dx * dx + dy * dy);

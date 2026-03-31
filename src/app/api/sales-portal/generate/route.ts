@@ -181,7 +181,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           text: generated.segments.filter((s) => s.type === "voice").map((s) => s.text).join(" "),
           voiceId: voice.id,
-          settings: { stability: 0.5, similarity_boost: 0.75 },
+          settings: { stability: 0.75, similarityBoost: 0.95, style: 0.05 },
         }),
       });
 

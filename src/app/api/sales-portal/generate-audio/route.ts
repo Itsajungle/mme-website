@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           text: body.editedScript,
           voiceId: body.voiceId,
-          settings: { stability: 0.5, similarity_boost: 0.75 },
+          settings: { stability: 0.75, similarityBoost: 0.95, style: 0.05 },
         }),
       });
 

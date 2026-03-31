@@ -1428,12 +1428,12 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
 
                             {/* Presenter video preview */}
                             {clip.type === "presenter" && clip.status === "complete" && clip.videoUrl && (
-                              <div className="rounded-lg border border-blue-400/20 overflow-hidden">
+                              <div className="rounded-lg border border-blue-400/20 overflow-hidden bg-black flex items-center justify-center" style={{ maxHeight: "320px" }}>
                                 <video
                                   src={clip.videoUrl}
                                   controls
-                                  className="w-full"
-                                  style={{ maxHeight: "200px" }}
+                                  className="h-full object-contain"
+                                  style={{ maxHeight: "320px" }}
                                 />
                               </div>
                             )}
@@ -1707,12 +1707,14 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                       <span className="text-[10px] font-mono text-blue-400 font-bold">Clip {clip.clipNumber}</span>
                       <span className="text-[10px] text-text-muted">{clip.label}</span>
                     </div>
-                    <video
-                      src={clip.videoUrl}
-                      controls
-                      className="w-full"
-                      style={{ maxHeight: "300px" }}
-                    />
+                    <div className="bg-black flex items-center justify-center" style={{ maxHeight: "400px" }}>
+                      <video
+                        src={clip.videoUrl}
+                        controls
+                        className="h-full object-contain"
+                        style={{ maxHeight: "400px" }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
