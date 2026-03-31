@@ -222,6 +222,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [renderId, setRenderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showLogoStudio, setShowLogoStudio] = useState(false);
+  const [introVideoBlob, setIntroVideoBlob] = useState<Blob | null>(null);
+  const [introVideoReady, setIntroVideoReady] = useState(false);
 
   // Demo mode
   const [demoMode, setDemoMode] = useState(saved.current?.demoMode ?? false);
@@ -626,13 +628,31 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       const overlays: RenderOverlay[] = [];
       const offerClip = clips.find((c) => c.type === "remotion_offer");
 
-      // 1. Logo intro (3s brand sting)
-      segments.push({
-        type: "remotion",
-        template: "LogoReveal",
-        duration: 3,
-        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
-      });
+      // 1. Logo intro — use fragment animation if recorded, otherwise Remotion
+      if (introVideoBlob) {
+        // Upload the recorded fragment animation to the server
+        console.log("[compose-video] Uploading recorded intro animation...");
+        const introForm = new FormData();
+        introForm.append("video", introVideoBlob, "intro.webm");
+        const uploadRes = await fetch("/api/video/upload-intro", { method: "POST", body: introForm });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
+          const introUrl = toAbsolute(uploadData.serveUrl);
+          console.log("[compose-video] Intro uploaded:", introUrl);
+          segments.push({ type: "heygen", videoUrl: introUrl, duration: 3 });
+        } else {
+          console.warn("[compose-video] Intro upload failed, falling back to Remotion");
+          segments.push({
+            type: "remotion", template: "LogoReveal", duration: 3,
+            props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
+          });
+        }
+      } else {
+        segments.push({
+          type: "remotion", template: "LogoReveal", duration: 3,
+          props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
+        });
+      }
 
       let runningTime = 3;
 
@@ -683,13 +703,27 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
 
       runningTime += clipDur;
 
-      // 3. Logo outro (3s brand sting)
-      segments.push({
-        type: "remotion",
-        template: "LogoReveal",
-        duration: 3,
-        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
-      });
+      // 3. Logo outro — reuse the uploaded fragment animation if available
+      if (introVideoBlob) {
+        const outroForm = new FormData();
+        outroForm.append("video", introVideoBlob, "outro.webm");
+        const outroUploadRes = await fetch("/api/video/upload-intro", { method: "POST", body: outroForm });
+        const outroUploadData = await outroUploadRes.json();
+        if (outroUploadData.success) {
+          const outroUrl = toAbsolute(outroUploadData.serveUrl);
+          segments.push({ type: "heygen", videoUrl: outroUrl, duration: 3 });
+        } else {
+          segments.push({
+            type: "remotion", template: "LogoReveal", duration: 3,
+            props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
+          });
+        }
+      } else {
+        segments.push({
+          type: "remotion", template: "LogoReveal", duration: 3,
+          props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
+        });
+      }
 
       console.log("[compose-video] Segments:", JSON.stringify(segments));
       console.log("[compose-video] Overlays:", JSON.stringify(overlays));
@@ -1172,7 +1206,19 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   logoUrl="/brands/tadg-riordan/logo-dark.png"
                   initialBgColor="#0A0F1E"
                   initialGlowColor="#00FF96"
+                  onVideoRecorded={(blob) => {
+                    setIntroVideoBlob(blob);
+                    setIntroVideoReady(true);
+                  }}
                 />
+                {introVideoReady && (
+                  <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                    <Check size={14} className="text-emerald-400" />
+                    <span className="text-xs text-emerald-400 font-medium">
+                      Logo animation recorded — will be used as intro &amp; outro when you compose
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
