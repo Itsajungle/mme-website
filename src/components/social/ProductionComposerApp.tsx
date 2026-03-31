@@ -627,7 +627,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         type: "remotion",
         template: "LogoReveal",
         duration: 3,
-        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#00FF96", tagline: brand.logoLine, platform: "instagram" },
+        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
       });
 
       let runningTime = 3;
@@ -684,7 +684,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         type: "remotion",
         template: "LogoReveal",
         duration: 3,
-        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#00FF96", tagline: brand.logoLine, platform: "instagram" },
+        props: { logoUrl, backgroundColor: "#0A0F1E", particleColor: "#FFFFFF", tagline: brand.logoLine, platform: "instagram" },
       });
 
       console.log("[compose-video] Segments:", JSON.stringify(segments));
