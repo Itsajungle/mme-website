@@ -218,6 +218,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [presenterVideosReady, setPresenterVideosReady] = useState(saved.current?.presenterVideosReady ?? false);
   const [imageReady, setImageReady] = useState(saved.current?.imageReady ?? false);
   const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(saved.current?.composedVideoUrl ?? null);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [modalVideoUrl, setModalVideoUrl] = useState('');
   const [renderId, setRenderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -668,10 +670,11 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             template: "StatCard",
             duration: clip.duration,
             props: {
-              stat: clip.offerData?.price ?? "",
-              label: clip.offerData?.headline ?? "",
+              statNumber: clip.offerData?.price ?? "",
+              statLabel: clip.offerData?.headline ?? "",
               subtitle: [clip.offerData?.finance, clip.offerData?.terms].filter(Boolean).join(" | "),
-              color: "#E31E24",
+              brandColor: "#E31E24",
+              platform: "instagram",
             },
           });
         } else if (clip.type === "remotion_outro") {
@@ -737,6 +740,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               const outputUrl = data.outputUrl ?? `/api/video/compose-download?renderId=${newRenderId}`;
               console.log("[compose-video] Complete! Output:", outputUrl);
               setComposedVideoUrl(outputUrl);
+              setModalVideoUrl(outputUrl);
+              setShowVideoModal(true);
               resolve();
             } else if (data.status === "failed" || attempts >= 60) {
               clearInterval(interval);
@@ -1622,12 +1627,12 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   <span className="text-xs text-accent font-mono">Producing...</span>
                 </motion.div>
               ) : composedVideoUrl ? (
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => { setModalVideoUrl(composedVideoUrl!); setShowVideoModal(true); }}>
                   <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
                     <Check size={20} className="text-emerald-400" />
                   </div>
                   <span className="text-xs text-emerald-400 font-semibold">Final video ready</span>
-                  <span className="text-[10px] text-text-muted">Scroll down to view &amp; download</span>
+                  <span className="text-[10px] text-accent">Click to watch</span>
                 </div>
               ) : pipelineStage === "complete" || presenterVideosReady ? (
                 <div className="flex flex-col items-center gap-2">
@@ -1772,42 +1777,46 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         </div>
       </div>
 
-      {/* === COMPOSED VIDEO — FULL WIDTH BOTTOM === */}
-      {composedVideoUrl && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="border-t border-border px-6 py-8"
+      {/* === FULL-SCREEN VIDEO MODAL === */}
+      {showVideoModal && (
+        <div
+          onClick={() => setShowVideoModal(false)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-5"
+          style={{ background: 'rgba(0,0,0,0.9)' }}
         >
-          <div className="max-w-4xl mx-auto space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-4xl bg-bg-deep rounded-xl p-5 border border-border"
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowVideoModal(false); }}
+              className="absolute -top-4 -right-4 w-9 h-9 rounded-full bg-red-500 border-2 border-white text-white font-bold flex items-center justify-center z-[10001] cursor-pointer shadow-lg"
+            >
+              ✕
+            </button>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text flex items-center gap-2">
                 <Film size={16} className="text-accent" />
-                <h3 className="text-sm font-semibold text-text">Final Composed Video</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={composedVideoUrl}
-                  download
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 bg-bg-deep text-accent hover:bg-accent/10 transition-colors"
-                >
-                  <Download size={14} />
-                  Download Video
-                </a>
-              </div>
+                Final Composed Video
+              </h3>
+              <a
+                href={modalVideoUrl}
+                download
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 bg-bg-deep text-accent hover:bg-accent/10 transition-colors"
+              >
+                <Download size={14} />
+                Download
+              </a>
             </div>
-            <div className="rounded-xl border border-accent/20 bg-black overflow-hidden">
-              <video
-                src={composedVideoUrl}
-                controls
-                autoPlay
-                className="w-full"
-                style={{ maxHeight: "70vh" }}
-              />
-            </div>
+            <video
+              src={modalVideoUrl}
+              controls
+              autoPlay
+              className="w-full rounded-lg bg-black"
+              style={{ maxHeight: '70vh' }}
+            />
           </div>
-        </motion.div>
+        </div>
       )}
     </div>
   );
