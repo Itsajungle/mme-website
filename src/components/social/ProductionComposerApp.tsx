@@ -617,75 +617,104 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         throw new Error("No presenter videos available — please generate presenter clips first");
       }
 
-      // Build segments
+      // Build segments — presenter clips are the base, image/card are OVERLAYS on them
       const segments: RenderSegment[] = [];
       const overlays: RenderOverlay[] = [];
+      const presenterClips = clips.filter((c) => c.type === "presenter" && c.status === "complete");
+      const offerClip = clips.find((c) => c.type === "remotion_offer");
 
-      for (const clip of clips) {
-        if (clip.type === "remotion_intro") {
-          segments.push({
-            type: "remotion",
-            template: "LogoReveal",
-            duration: clip.duration,
-            props: { logoUrl, logoColor: "#E31E24", tagline: brand.logoLine, backgroundColor: "#E31E24" },
-          });
-        } else if (clip.type === "presenter") {
-          const result = presenterResults.find((r) => r.clipNumber === clip.clipNumber);
-          // If this specific presenter clip has no video, use the closest available one
-          const videoUrl = result?.videoUrl || presenterResults[0].videoUrl;
-          segments.push({
-            type: "heygen",
-            videoUrl,
-            duration: clip.duration,
-          });
+      // 1. Logo intro (brief brand sting, 2s)
+      segments.push({
+        type: "remotion",
+        template: "LogoReveal",
+        duration: 2,
+        props: { logoUrl, logoColor: "#E31E24", tagline: brand.logoLine, backgroundColor: "#E31E24" },
+      });
 
-          if (lowerThird.name) {
-            const startTime = getClipStartTime(clips, clips.indexOf(clip)) + 2;
-            overlays.push({
-              template: "LowerThird",
-              startTime,
-              duration: 5,
-              mode: "overlay",
-              props: { name: lowerThird.name, title: lowerThird.title },
-            });
-          }
-        } else if (clip.type === "image_overlay") {
-          const clip3Presenter = presenterResults.find((r) => r.clipNumber === 3);
-          const videoUrl = clip3Presenter?.videoUrl || presenterResults[0].videoUrl;
-          segments.push({
-            type: "heygen",
-            videoUrl,
-            duration: clip.duration,
+      let runningTime = 2; // seconds after logo intro
+
+      // 2. First presenter clip — with LowerThird + ProductShowcase overlay
+      const pres1 = presenterResults.find((r) => r.clipNumber === presenterClips[0]?.clipNumber);
+      if (pres1) {
+        const clipDur = presenterClips[0].duration;
+        segments.push({ type: "heygen", videoUrl: pres1.videoUrl, duration: clipDur });
+        if (lowerThird.name) {
+          overlays.push({
+            template: "LowerThird",
+            startTime: runningTime + 2,
+            duration: 5,
+            mode: "overlay",
+            props: { name: lowerThird.name, title: lowerThird.title },
           });
+        }
+        if (clip3ImageUrl) {
           overlays.push({
             template: "ProductShowcase",
-            startTime: getClipStartTime(clips, clips.indexOf(clip)),
-            duration: clip.duration,
+            startTime: runningTime + Math.floor(clipDur / 2),
+            duration: Math.ceil(clipDur / 2),
             mode: "fullscreen",
             props: { imageUrl: toAbsolute(clip3ImageUrl) },
           });
-        } else if (clip.type === "remotion_offer") {
-          segments.push({
-            type: "remotion",
+        }
+        runningTime += clipDur;
+      }
+
+      // 3. Second presenter clip — with LowerThird + StatCard overlay
+      const pres2 = presenterResults.find((r) => r.clipNumber === presenterClips[1]?.clipNumber);
+      if (pres2) {
+        const clipDur = presenterClips[1].duration;
+        segments.push({ type: "heygen", videoUrl: pres2.videoUrl, duration: clipDur });
+        if (lowerThird.name) {
+          overlays.push({
+            template: "LowerThird",
+            startTime: runningTime + 2,
+            duration: 5,
+            mode: "overlay",
+            props: { name: lowerThird.name, title: lowerThird.title },
+          });
+        }
+        if (offerClip?.offerData) {
+          overlays.push({
             template: "StatCard",
-            duration: clip.duration,
+            startTime: runningTime + Math.floor(clipDur / 2),
+            duration: Math.ceil(clipDur / 2),
+            mode: "fullscreen",
             props: {
-              statNumber: clip.offerData?.price ?? "",
-              statLabel: clip.offerData?.headline ?? "",
-              subtitle: [clip.offerData?.finance, clip.offerData?.terms].filter(Boolean).join(" | "),
+              statNumber: offerClip.offerData.price ?? "",
+              statLabel: offerClip.offerData.headline ?? "",
+              subtitle: [offerClip.offerData.finance, offerClip.offerData.terms].filter(Boolean).join(" | "),
               brandColor: "#E31E24",
               platform: "instagram",
             },
           });
-        } else if (clip.type === "remotion_outro") {
-          segments.push({
-            type: "remotion",
-            template: "LogoReveal",
-            duration: clip.duration,
-            props: { logoUrl, logoColor: "#E31E24", variant: "outro" },
+        }
+        runningTime += clipDur;
+      }
+
+      // 4. Third presenter clip — with LowerThird
+      const pres3 = presenterResults.find((r) => r.clipNumber === presenterClips[2]?.clipNumber);
+      if (pres3) {
+        const clipDur = presenterClips[2].duration;
+        segments.push({ type: "heygen", videoUrl: pres3.videoUrl, duration: clipDur });
+        if (lowerThird.name) {
+          overlays.push({
+            template: "LowerThird",
+            startTime: runningTime + 2,
+            duration: 5,
+            mode: "overlay",
+            props: { name: lowerThird.name, title: lowerThird.title },
           });
         }
+        runningTime += clipDur;
       }
+
+      // 5. Logo outro (brief brand sting, 2s)
+      segments.push({
+        type: "remotion",
+        template: "LogoReveal",
+        duration: 2,
+        props: { logoUrl, logoColor: "#E31E24", variant: "outro" },
+      });
 
       console.log("[compose-video] Segments:", JSON.stringify(segments));
       console.log("[compose-video] Overlays:", JSON.stringify(overlays));
@@ -1626,14 +1655,6 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   <Loader2 size={24} className="text-accent animate-spin" />
                   <span className="text-xs text-accent font-mono">Producing...</span>
                 </motion.div>
-              ) : composedVideoUrl ? (
-                <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => { setModalVideoUrl(composedVideoUrl!); setShowVideoModal(true); }}>
-                  <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                    <Check size={20} className="text-emerald-400" />
-                  </div>
-                  <span className="text-xs text-emerald-400 font-semibold">Final video ready</span>
-                  <span className="text-[10px] text-accent">Click to watch</span>
-                </div>
               ) : pipelineStage === "complete" || presenterVideosReady ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center">
@@ -1676,6 +1697,69 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               </div>
             )}
 
+            {/* ── Compose Section — below presenter clips ──── */}
+            {presenterVideosReady && (
+              <div className="mt-6 border-t border-border pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Film size={16} className="text-accent" />
+                    <h3 className="text-sm font-semibold text-text">Final Video</h3>
+                  </div>
+                  {!composedVideoUrl && !isProducing && (
+                    <button
+                      onClick={handleComposeVideo}
+                      disabled={isProducing}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold bg-accent text-bg-deep hover:bg-accent/90 transition-colors"
+                    >
+                      <Film size={14} />
+                      Compose Final Video
+                    </button>
+                  )}
+                  {composedVideoUrl && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => { setModalVideoUrl(composedVideoUrl); setShowVideoModal(true); }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-bg-deep hover:bg-accent/90 transition-colors"
+                      >
+                        <Play size={14} />
+                        Watch
+                      </button>
+                      <a
+                        href={composedVideoUrl}
+                        download
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 text-accent hover:bg-accent/10 transition-colors"
+                      >
+                        <Download size={14} />
+                        Download
+                      </a>
+                    </div>
+                  )}
+                </div>
+                {isProducing && pipelineStage === "composition" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                      <span className="text-sm text-text-muted">Composing final video... {Math.round(pipelineProgress)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-bg-card rounded-full overflow-hidden">
+                      <div className="h-full bg-accent transition-all duration-300" style={{ width: `${pipelineProgress}%` }} />
+                    </div>
+                  </div>
+                )}
+                {composedVideoUrl && (
+                  <div className="rounded-xl border border-accent/20 bg-black overflow-hidden cursor-pointer"
+                       onClick={() => { setModalVideoUrl(composedVideoUrl); setShowVideoModal(true); }}>
+                    <video
+                      src={composedVideoUrl}
+                      className="w-full"
+                      style={{ maxHeight: '400px' }}
+                    />
+                    <div className="p-3 text-center text-xs text-text-muted">Click to play in full screen</div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Action Buttons ─────────────────────────────── */}
 
             {/* Step 1: Generate Presenter Clips (only when clips don't have videos yet) */}
@@ -1709,37 +1793,6 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               </button>
             )}
 
-            {/* Step 2: Compose Final Video (only when presenter clips are ready) */}
-            {presenterVideosReady && !composedVideoUrl && (
-              <button
-                onClick={handleComposeVideo}
-                disabled={isProducing}
-                className={cn(
-                  "w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors",
-                  !isProducing
-                    ? "bg-gradient-to-r from-accent to-emerald-400 text-bg hover:opacity-90"
-                    : "bg-white/5 text-text-muted cursor-not-allowed"
-                )}
-              >
-                {isProducing && pipelineStage === "composition" ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Composing Final Video...
-                  </>
-                ) : isProducing ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Film size={14} />
-                    Compose Final Video
-                  </>
-                )}
-              </button>
-            )}
-
             {/* Regenerate Presenter Clips (when already done, in case user wants to redo) */}
             {presenterVideosReady && !isProducing && (
               <button
@@ -1749,18 +1802,6 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 <RotateCcw size={12} />
                 Regenerate Presenter Clips
               </button>
-            )}
-
-            {/* Download button */}
-            {composedVideoUrl && (
-              <a
-                href={composedVideoUrl}
-                download
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border border-accent/50 bg-bg-deep text-accent hover:bg-accent/10 transition-colors"
-              >
-                <Download size={14} />
-                Download Video
-              </a>
             )}
 
             {/* Reset Production — always visible when there's any state to clear */}
