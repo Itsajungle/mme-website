@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Play, RotateCcw, Download, Palette, Sparkles, Zap } from "lucide-react";
 
-const GRID_SIZE = 30;
+const GRID_SIZE = 50;
 
 interface FragmentAnimatorProps {
   logoUrl?: string;
@@ -171,7 +171,7 @@ export default function FragmentAnimator({
           x: start.x, y: start.y,
           targetX: sourceX, targetY: sourceY,
           rotation: start.rotation, targetRotation: 0,
-          radius: (stepX / 2) * 1.6, sourceX, sourceY,
+          radius: (stepX / 2) * 1.3, sourceX, sourceY,
         });
       }
     }
@@ -206,6 +206,8 @@ export default function FragmentAnimator({
     }
 
     const p = progressRef.current;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     fragmentsRef.current.forEach((frag) => {
       ctx.save();
       ctx.translate(frag.x, frag.y);
@@ -237,6 +239,8 @@ export default function FragmentAnimator({
   const animate = useCallback(() => {
     if (!isAnimating || !image) return;
     let totalDist = 0, maxDist = 0;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     fragmentsRef.current.forEach((frag) => {
       const dx = frag.targetX - frag.x, dy = frag.targetY - frag.y, dr = frag.targetRotation - frag.rotation;
       const dist = Math.sqrt(dx * dx + dy * dy);
