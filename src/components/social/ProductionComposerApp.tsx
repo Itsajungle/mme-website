@@ -1699,6 +1699,14 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                         <Download size={14} />
                         Download
                       </a>
+                      <button
+                        onClick={handleComposeVideo}
+                        disabled={isProducing}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 transition-colors"
+                      >
+                        <Film size={14} />
+                        Re-compose
+                      </button>
                     </div>
                   )}
                 </div>
