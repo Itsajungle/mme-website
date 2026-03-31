@@ -69,12 +69,10 @@ const CLIP_TYPE_CONFIG: Record<ClipType, { label: string; color: string; bgColor
 
 const DEFAULT_CLIPS: TimelineClip[] = [
   { clipNumber: 1, type: "remotion_intro", label: "Brand Intro", duration: 3, status: "pending", notes: "Animated logo reveal" },
-  { clipNumber: 2, type: "presenter", label: "Presenter Intro", duration: 10, status: "pending" },
-  { clipNumber: 3, type: "image_overlay", label: "Product Showcase", duration: 12, status: "pending" },
-  { clipNumber: 4, type: "presenter", label: "Presenter Offer", duration: 10, status: "pending" },
-  { clipNumber: 5, type: "remotion_offer", label: "Offer Card", duration: 5, status: "pending" },
-  { clipNumber: 6, type: "presenter", label: "Presenter CTA", duration: 8, status: "pending" },
-  { clipNumber: 7, type: "remotion_outro", label: "Brand Outro", duration: 3, status: "pending" },
+  { clipNumber: 2, type: "presenter", label: "Presenter", duration: 20, status: "pending" },
+  { clipNumber: 3, type: "image_overlay", label: "Product Showcase", duration: 5, status: "pending", notes: "Overlay on presenter" },
+  { clipNumber: 4, type: "remotion_offer", label: "Offer Card", duration: 5, status: "pending", notes: "Overlay on presenter" },
+  { clipNumber: 5, type: "remotion_outro", label: "Brand Outro", duration: 3, status: "pending" },
 ];
 
 function getClipStartTime(clips: TimelineClip[] | undefined, clipIndex: number): number {
@@ -532,8 +530,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
 
       // Mark Remotion clips as ready (they'll be composed in the next step)
       updateClip(1, { status: "complete" });
+      updateClip(4, { status: "complete" });
       updateClip(5, { status: "complete" });
-      updateClip(7, { status: "complete" });
 
       // Stop here — presenter clips are ready. User clicks "Compose Final Video" for next step.
       setPipelineStage("idle");
@@ -598,8 +596,8 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       setPipelineStage("composition");
       setPipelineProgress(70);
       updateClip(1, { status: "complete" });
+      updateClip(4, { status: "complete" });
       updateClip(5, { status: "complete" });
-      updateClip(7, { status: "complete" });
 
       const appUrl = typeof window !== "undefined" ? window.location.origin : "";
       const toAbsolute = (u: string) => (!u || u.startsWith("http")) ? u : `${appUrl}${u}`;

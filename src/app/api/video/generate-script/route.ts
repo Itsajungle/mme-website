@@ -1,40 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
-const SYSTEM_PROMPT = `You are a senior video ad scriptwriter specialising in Irish and UK social media advertising. You create structured 7-clip video ad scripts for broadcast-quality social video ads.
+const SYSTEM_PROMPT = `You are a senior video ad scriptwriter specialising in Irish and UK social media advertising. You create structured 5-clip video ad scripts for broadcast-quality social video ads.
 
-SCRIPT STRUCTURE — 7 CLIPS:
-1. BRAND INTRO (Remotion animation) — 3-4 seconds, logo reveal
-2. PRESENTER INTRO — 8-12 seconds, avatar introduces the offer
-3. PRODUCT SHOWCASE (image + voiceover) — 8-15 seconds, no avatar visible, voice describes product
-4. PRESENTER OFFER — 8-12 seconds, avatar details the specific deal
-5. OFFER CARD (Remotion animation) — 4-6 seconds, animated deal card
-6. PRESENTER CTA — 6-10 seconds, call to action, ends with logo line
-7. BRAND OUTRO (Remotion animation) — 3-4 seconds, logo outro
+SCRIPT STRUCTURE — 5 CLIPS:
+1. BRAND INTRO (Remotion animation) — 3 seconds, logo reveal
+2. PRESENTER — 15-25 seconds, avatar delivers the ENTIRE ad in one continuous take. Introduces the brand, describes the offer, delivers the call to action, ends with the logo line.
+3. PRODUCT SHOWCASE (image overlay) — 5 seconds, appears as overlay on the presenter video
+4. OFFER CARD (Remotion animation) — 5 seconds, appears as overlay on the presenter video
+5. BRAND OUTRO (Remotion animation) — 3 seconds, logo outro
 
 CRITICAL RULES:
 - Write in natural, conversational Irish English — NOT American ad-speak
-- The brand's logo line MUST appear at the end of clip 6
-- Clips 2, 3, 4, 6 must flow as one continuous narrative arc
+- The brand's logo line MUST appear at the end of clip 2's script
+- Clip 2 is ONE single continuous script — the presenter delivers everything in one take
 - Speaking rate: ~2.5 words per second for natural delivery
-- Word count per clip: duration × 2.5 words
+- Word count for clip 2: duration × 2.5 words (e.g. 20s = ~50 words)
 - No competitor mentions, no misleading claims
 - Clip 3 needs an imagePrompt for AI image generation (photorealistic, cinematic)
-- Clip 5 needs structured offerData with headline, price, finance, terms
+- Clip 4 needs structured offerData with headline, price, finance, terms
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching this structure:
 {
   "clips": [
     { "clipNumber": 1, "type": "remotion_intro", "duration": 3, "notes": "Logo reveal animation" },
-    { "clipNumber": 2, "type": "presenter", "duration": 10, "script": "...", "direction": "Warm, enthusiastic" },
-    { "clipNumber": 3, "type": "image_overlay", "duration": 12, "script": "...", "imagePrompt": "Photorealistic..." },
-    { "clipNumber": 4, "type": "presenter", "duration": 10, "script": "...", "direction": "Excited, deal-focused" },
-    { "clipNumber": 5, "type": "remotion_offer", "duration": 5, "offerData": { "headline": "...", "price": "...", "finance": "...", "terms": "..." } },
-    { "clipNumber": 6, "type": "presenter", "duration": 8, "script": "...", "direction": "Energetic CTA" },
-    { "clipNumber": 7, "type": "remotion_outro", "duration": 3, "notes": "Logo outro animation" }
+    { "clipNumber": 2, "type": "presenter", "duration": 20, "script": "...", "direction": "Warm, enthusiastic, building to energetic CTA" },
+    { "clipNumber": 3, "type": "image_overlay", "duration": 5, "imagePrompt": "Photorealistic...", "notes": "Overlay on presenter" },
+    { "clipNumber": 4, "type": "remotion_offer", "duration": 5, "offerData": { "headline": "...", "price": "...", "finance": "...", "terms": "..." }, "notes": "Overlay on presenter" },
+    { "clipNumber": 5, "type": "remotion_outro", "duration": 3, "notes": "Logo outro animation" }
   ],
-  "totalDuration": 51,
+  "totalDuration": 36,
   "voiceTone": "Warm Irish, conversational, trustworthy",
   "targetAudience": "..."
 }`;
@@ -69,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     const carDetails = [carMake, carModel, carYear].filter(Boolean).join(" ");
 
-    const userPrompt = `Write a 7-clip video ad script for a social media video ad.
+    const userPrompt = `Write a 5-clip video ad script for a social media video ad.
 
 BRAND: ${brandName || brandSlug}
 SECTOR: ${sectorName || "general"}
@@ -80,7 +76,7 @@ CAMPAIGN CONCEPT: ${concept}
 ${carDetails ? `CAR DETAILS: ${carDetails}` : ""}
 ${dealDetails ? `DEAL DETAILS: ${dealDetails}` : ""}
 
-Generate all 7 clips following the exact structure. Make the script feel natural, warm, and Irish. The presenter clips (2, 4, 6) should flow as one continuous conversation.`;
+Generate all 5 clips following the exact structure. Make the script feel natural, warm, and Irish. Clip 2 is the single presenter clip — one continuous take delivering the entire ad.`;
 
     const client = new Anthropic();
 
