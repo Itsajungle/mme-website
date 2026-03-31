@@ -1,4 +1,5 @@
 "use client";
+import FragmentAnimator from "./FragmentAnimator";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -220,6 +221,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [modalVideoUrl, setModalVideoUrl] = useState<string>(''  );
   const [renderId, setRenderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showLogoStudio, setShowLogoStudio] = useState(false);
 
   // Demo mode
   const [demoMode, setDemoMode] = useState(saved.current?.demoMode ?? false);
@@ -1151,6 +1153,29 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             </div>
           )}
 
+
+          {/* Logo Animation Studio */}
+          <div className="border-b border-border">
+            <button
+              onClick={() => setShowLogoStudio(!showLogoStudio)}
+              className="w-full px-6 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+            >
+              <label className="text-[10px] uppercase tracking-wider text-emerald-400 font-mono flex items-center gap-1.5 cursor-pointer">
+                <Sparkles size={10} />
+                Logo Animation Studio
+              </label>
+              <ChevronDown size={14} className={"text-white/40 transition-transform " + (showLogoStudio ? "rotate-180" : "")} />
+            </button>
+            {showLogoStudio && (
+              <div className="px-6 pb-6">
+                <FragmentAnimator
+                  logoUrl="/brands/tadg-riordan/logo-dark.png"
+                  initialBgColor="#0A0F1E"
+                  initialGlowColor="#00FF96"
+                />
+              </div>
+            )}
+          </div>
           {/* 7-Clip Timeline */}
           <div className="p-6 space-y-4">
             <div className="flex items-center justify-between">
