@@ -136,6 +136,10 @@ export async function POST(req: NextRequest) {
               type: "audio",
               audio_url: audioUrl,
             },
+            background: {
+              type: "color",
+              value: "#000000",
+            },
           },
         ],
         dimension,

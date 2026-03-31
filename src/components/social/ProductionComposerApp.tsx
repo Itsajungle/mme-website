@@ -1206,6 +1206,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   logoUrl="/brands/tadg-riordan/logo-dark.png"
                   initialBgColor="#0A0F1E"
                   initialGlowColor="#00FF96"
+                  targetAspectRatio={aspectRatio}
                   onVideoRecorded={(blob) => {
                     setIntroVideoBlob(blob);
                     setIntroVideoReady(true);

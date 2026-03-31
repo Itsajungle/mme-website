@@ -11,7 +11,15 @@ interface FragmentAnimatorProps {
   initialBgColor?: string;
   initialGlowColor?: string;
   compact?: boolean;
+  targetAspectRatio?: string; // "9:16" | "16:9" | "1:1" | "4:5"
 }
+
+const CANVAS_SIZES: Record<string, { width: number; height: number }> = {
+  "9:16": { width: 1080, height: 1920 },
+  "16:9": { width: 1920, height: 1080 },
+  "1:1": { width: 1080, height: 1080 },
+  "4:5": { width: 1080, height: 1350 },
+};
 
 interface Fragment {
   x: number; y: number;
@@ -84,6 +92,7 @@ export default function FragmentAnimator({
   initialBgColor = "#0A0F1E",
   initialGlowColor = "#00FF96",
   compact = false,
+  targetAspectRatio = "9:16",
 }: FragmentAnimatorProps) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -172,11 +181,12 @@ export default function FragmentAnimator({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (progressRef.current >= 0.99 && !isAnimating) {
+      const { scaledW, scaledH, offsetX, offsetY } = calcLogoTransform(image);
       if (glowEnabled) {
         ctx.shadowColor = glowColor;
         ctx.shadowBlur = glowIntensity;
       }
-      ctx.drawImage(image, 0, 0);
+      ctx.drawImage(image, offsetX, offsetY, scaledW, scaledH);
       ctx.shadowBlur = 0;
       return;
     }
@@ -194,12 +204,17 @@ export default function FragmentAnimator({
       ctx.beginPath();
       ctx.arc(0, 0, frag.radius, 0, Math.PI * 2);
       ctx.clip();
+      // Map fragment source coords back to original image space for sampling
+      const { scale, offsetX, offsetY } = calcLogoTransform(image);
+      const origSrcX = (frag.sourceX - offsetX) / scale;
+      const origSrcY = (frag.sourceY - offsetY) / scale;
+      const origRadius = frag.radius / scale;
       ctx.drawImage(image,
-        frag.sourceX - frag.radius, frag.sourceY - frag.radius, frag.radius * 2, frag.radius * 2,
+        origSrcX - origRadius, origSrcY - origRadius, origRadius * 2, origRadius * 2,
         -frag.radius, -frag.radius, frag.radius * 2, frag.radius * 2);
       ctx.restore();
     });
-  }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor]);
+  }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor, calcLogoTransform]);
 
   const stopRecording = useCallback(() => {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
@@ -293,8 +308,27 @@ export default function FragmentAnimator({
     setTimeout(() => { setIsAnimating(true); setProgress(0); }, 100);
   };
 
-  const canvasW = image?.width || 800;
-  const canvasH = image?.height || 450;
+  // Use target aspect ratio for canvas, scale logo to fit within it
+  const targetSize = CANVAS_SIZES[targetAspectRatio] || CANVAS_SIZES["9:16"];
+  const canvasW = targetSize.width;
+  const canvasH = targetSize.height;
+
+  // Logo scaling helper — centres logo within canvas at max 70% width, 40% height
+  function calcLogoTransform(img: HTMLImageElement) {
+    const maxW = canvasW * 0.7;
+    const maxH = canvasH * 0.4;
+    const scale = Math.min(maxW / img.width, maxH / img.height);
+    const scaledW = img.width * scale;
+    const scaledH = img.height * scale;
+    const offsetX = (canvasW - scaledW) / 2;
+    const offsetY = (canvasH - scaledH) / 2;
+    return { scale, scaledW, scaledH, offsetX, offsetY };
+  }
+
+
+
+  // Calculate logo scale and position to fit centred in canvas
+
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 overflow-hidden">
