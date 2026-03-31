@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  Brain,
   Play,
   Pause,
   Download,
@@ -32,6 +33,7 @@ import { SalesPipeline } from "./SalesPipeline";
 import { SalesCalendar } from "./SalesCalendar";
 import { RepProfileCards } from "./RepProfileCards";
 import { RepPitchView } from "./RepPitchView";
+import { SalesAssistantDemo } from "./SalesAssistantDemo";
 import type {
   DemoAdBrief,
   GenerateResponse,
@@ -42,13 +44,14 @@ import { PIPELINE_LABELS } from "@/lib/sales-portal/types";
 import { DEMO_REPS } from "@/lib/sales-portal/demo-reps";
 import { SALES_REPS } from "@/lib/sales-portal/demo-data";
 
-type PortalTab = "pipeline" | "calendar" | "team" | "pitch" | "studio";
+type PortalTab = "pipeline" | "calendar" | "team" | "pitch" | "assistant" | "studio";
 
 const TABS: { id: PortalTab; label: string; icon: typeof Kanban }[] = [
   { id: "pipeline", label: "Pipeline", icon: Kanban },
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "team", label: "Team", icon: Users },
   { id: "pitch", label: "The Pitch", icon: BarChart3 },
+  { id: "assistant", label: "Sales Assistant", icon: Brain },
   { id: "studio", label: "Demo Studio", icon: Radio },
 ];
 
@@ -370,6 +373,9 @@ export function SalesDemoBoard({ stationId, stationName }: SalesDemoBoardProps) 
 
       {/* Pitch tab */}
       {activeTab === "pitch" && <RepPitchView filterRepId={filterRepId} />}
+
+      {/* Sales Assistant tab */}
+      {activeTab === "assistant" && <SalesAssistantDemo stationName={stationName} />}
 
       {/* Demo Studio tab */}
       {activeTab === "studio" && (
