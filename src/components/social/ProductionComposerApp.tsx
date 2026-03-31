@@ -599,7 +599,9 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       updateClip(5, { status: "complete" });
       updateClip(7, { status: "complete" });
 
-      const logoUrl = "/brands/tadg-riordan/logo-dark.png";
+      const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+      const toAbsolute = (u: string) => (!u || u.startsWith("http")) ? u : `${appUrl}${u}`;
+      const logoUrl = toAbsolute("/brands/tadg-riordan/logo-dark.png");
 
       // Gather presenter video URLs from existing clips
       const presenterResults = clips
@@ -658,7 +660,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             startTime: getClipStartTime(clips, clips.indexOf(clip)),
             duration: clip.duration,
             mode: "fullscreen",
-            props: { imageUrl: clip3ImageUrl },
+            props: { imageUrl: toAbsolute(clip3ImageUrl) },
           });
         } else if (clip.type === "remotion_offer") {
           segments.push({
