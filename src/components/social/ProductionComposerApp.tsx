@@ -69,7 +69,7 @@ const CLIP_TYPE_CONFIG: Record<ClipType, { label: string; color: string; bgColor
 
 const DEFAULT_CLIPS: TimelineClip[] = [
   { clipNumber: 1, type: "remotion_intro", label: "Brand Intro", duration: 3, status: "pending", notes: "Animated logo reveal" },
-  { clipNumber: 2, type: "presenter", label: "Presenter", duration: 20, status: "pending" },
+  { clipNumber: 2, type: "presenter", label: "Presenter", duration: 30, status: "pending" },
   { clipNumber: 3, type: "image_overlay", label: "Product Showcase", duration: 5, status: "pending", notes: "Overlay on presenter" },
   { clipNumber: 4, type: "remotion_offer", label: "Offer Card", duration: 5, status: "pending", notes: "Overlay on presenter" },
   { clipNumber: 5, type: "remotion_outro", label: "Brand Outro", duration: 3, status: "pending" },
@@ -633,7 +633,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       // 2. Single presenter clip — continuous narration
       const pres1 = presenterResults[0];
       const pres1Clip = clips.find((c) => c.type === "presenter" && c.status === "complete" && c.clipNumber === pres1.clipNumber);
-      const clipDur = pres1Clip?.duration ?? 15;
+      const clipDur = pres1Clip?.duration ?? 30;
       segments.push({ type: "heygen", videoUrl: pres1.videoUrl, duration: clipDur });
 
       // LowerThird overlay — appears 2s into presenter clip, lasts 5s

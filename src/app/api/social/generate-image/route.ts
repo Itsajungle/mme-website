@@ -23,8 +23,8 @@ export async function POST(request: Request) {
 
     // Only use sector name for visual style hints — keep prompt clean
     const enrichedPrompt = brand
-      ? `${prompt} — professional ${brand.sectorName.toLowerCase()} sector photography style`
-      : prompt;
+      ? `${prompt} — professional ${brand.sectorName.toLowerCase()} sector photography style. IMPORTANT: Do NOT include any text, logos, brand names, signage, or watermarks in the image.`
+      : `${prompt}. IMPORTANT: Do NOT include any text, logos, brand names, signage, or watermarks in the image.`;
 
     const result = await generateImage({
       prompt: enrichedPrompt,
