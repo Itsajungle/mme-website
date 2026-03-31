@@ -380,7 +380,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               delete pollingRef.current[`clip-${clipNumber}`];
               // Update clip with actual video duration from presenter engine
               if (data.duration && typeof data.duration === "number") {
-                updateClip(clipNumber, { duration: Math.ceil(data.duration) });
+                updateClip(clipNumber, { duration: Math.round(data.duration * 10) / 10 });
               }
               resolve(data.video_url ?? "");
             } else if (data.status === "failed" || attempts >= maxAttempts) {
@@ -740,7 +740,17 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               composePollingRef.current = null;
               const outputUrl = data.outputUrl ?? `/api/video/compose-download?renderId=${newRenderId}`;
               console.log("[compose-video] Complete! Output:", outputUrl);
-              setComposedVideoUrl(outputUrl);
+              // Cache video as blob for reliable replay (render server may clean up)
+              try {
+                const videoRes = await fetch(outputUrl);
+                const videoBlob = await videoRes.blob();
+                const blobUrl = URL.createObjectURL(videoBlob);
+                setComposedVideoUrl(blobUrl);
+                setModalVideoUrl(outputUrl); // Keep original URL for download
+              } catch {
+                setComposedVideoUrl(outputUrl);
+                setModalVideoUrl(outputUrl);
+              }
               setShowVideoModal(true);
               resolve();
             } else if (data.status === "failed" || attempts >= 60) {
@@ -1663,7 +1673,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                         Watch
                       </button>
                       <a
-                        href={composedVideoUrl}
+                        href={modalVideoUrl || composedVideoUrl}
                         download
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 text-accent hover:bg-accent/10 transition-colors"
                       >
@@ -1787,7 +1797,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 Final Composed Video
               </h3>
               <a
-                href={composedVideoUrl}
+                href={modalVideoUrl || composedVideoUrl}
                 download
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 bg-bg-deep text-accent hover:bg-accent/10 transition-colors"
               >
@@ -1799,6 +1809,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               src={composedVideoUrl}
               controls
               autoPlay
+              preload="auto"
               className="w-full rounded-lg bg-black"
               style={{ maxHeight: '70vh' }}
             />
