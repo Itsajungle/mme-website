@@ -17,6 +17,8 @@ CRITICAL RULES:
 - Speaking rate: ~2.5 words per second for natural delivery
 - Word count for clip 2: duration × 2.5 words (e.g. 30s = ~75 words)
 - No competitor mentions, no misleading claims
+- CONSISTENCY IS CRITICAL: The offer card (clip 4) MUST match the presenter script (clip 2) exactly. If the presenter says "2026 Corolla", the offer card headline must say "2026 Corolla". If the presenter mentions a price or finance amount, the offer card must use the exact same figures. Never generate different years, prices, or models between clips.
+- If car details are provided in the brief, use EXACTLY those details across ALL clips — do not invent different years, prices, or specs
 - Clip 3 needs an imagePrompt for AI image generation. CRITICAL: The image must show ONLY the vehicle in a clean, generic, gleaming car showroom. NO text, NO logos, NO brand names, NO dealership names, NO signage of any kind. The car and showroom should look premium, polished, and appealing. Photorealistic, cinematic lighting.
 - Clip 4 needs structured offerData with headline, price, finance, terms
 
@@ -76,7 +78,9 @@ CAMPAIGN CONCEPT: ${concept}
 ${carDetails ? `CAR DETAILS: ${carDetails}` : ""}
 ${dealDetails ? `DEAL DETAILS: ${dealDetails}` : ""}
 
-Generate all 5 clips following the exact structure. Make the script feel natural, warm, and Irish. Clip 2 is the single presenter clip — one continuous take delivering the entire ad.`;
+Generate all 5 clips following the exact structure. Make the script feel natural, warm, and Irish. Clip 2 is the single presenter clip — one continuous take delivering the entire ad.
+
+IMPORTANT: The offer card in clip 4 MUST use the exact same car year, model, price, and finance details as mentioned in the presenter script (clip 2). These must match perfectly.`;
 
     const client = new Anthropic();
 
