@@ -18,6 +18,7 @@ export interface VoiceSettings {
   style: number; // 0-1
   useSpeakerBoost: boolean;
   speed: number; // 0.5-2.0
+  isCloned?: boolean; // true for cloned voices — uses higher fidelity settings
 }
 
 export interface GeneratedAudio {

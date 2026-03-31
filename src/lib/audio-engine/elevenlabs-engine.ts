@@ -102,9 +102,9 @@ export async function generateSpeech(
     text,
     model_id: "eleven_v3",
     voice_settings: {
-      stability: settings.stability ?? 0.5,
-      similarity_boost: settings.similarityBoost ?? 0.8,
-      style: settings.style ?? 0.3,
+      stability: settings.stability ?? (settings.isCloned ? 0.75 : 0.5),
+      similarity_boost: settings.similarityBoost ?? (settings.isCloned ? 0.95 : 0.8),
+      style: settings.style ?? (settings.isCloned ? 0.05 : 0.3),
       use_speaker_boost: settings.useSpeakerBoost ?? true,
     },
     output_format: "mp3_44100_128",

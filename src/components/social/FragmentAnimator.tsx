@@ -116,12 +116,14 @@ export default function FragmentAnimator({
   useEffect(() => {
     if (!logoUrl) return;
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => {
       setImage(img);
       setIsAnimating(false);
       setProgress(0);
       progressRef.current = 0;
+    };
+    img.onerror = () => {
+      console.error('[FragmentAnimator] Failed to load logo:', logoUrl);
     };
     img.src = logoUrl;
   }, [logoUrl]);
