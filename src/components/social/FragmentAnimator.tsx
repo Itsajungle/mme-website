@@ -228,7 +228,7 @@ export default function FragmentAnimator({
         -frag.radius, -frag.radius, frag.radius * 2, frag.radius * 2);
       ctx.restore();
     });
-  }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor, canvasW, canvasH]);
+  }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor, targetAspectRatio]);
 
   const stopRecording = useCallback(() => {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
