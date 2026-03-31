@@ -334,12 +334,10 @@ export function SalesAssistantDemo({ stationName }: SalesAssistantDemoProps) {
   const [completedAgents, setCompletedAgents] = useState<Set<number>>(new Set());
 
   const handleAgentClick = (i: number) => {
-    if (i <= Math.max(...Array.from(completedAgents), -1) + 1 || i === 0) {
-      setActiveAgent(i);
-      const newCompleted = new Set(completedAgents);
-      for (let j = 0; j < i; j++) newCompleted.add(j);
-      setCompletedAgents(newCompleted);
-    }
+    setActiveAgent(i);
+    const newCompleted = new Set(completedAgents);
+    for (let j = 0; j < i; j++) newCompleted.add(j);
+    setCompletedAgents(newCompleted);
   };
 
   const panels = [<ProspectorPanel key="p" />, <AnalystPanel key="a" />, <PresentationPanel key="pr" />, <DirectorPanel key="d" />];
@@ -377,7 +375,7 @@ export function SalesAssistantDemo({ stationName }: SalesAssistantDemoProps) {
                   onClick={() => handleAgentClick(i)}
                   className={cn(
                     "w-full text-left rounded-xl border p-4 transition-all",
-                    active ? cn(colorClasses[i], "scale-[1.02] shadow-lg") : completed ? "border-white/10 bg-bg-card opacity-80" : "border-border bg-bg-card opacity-50",
+                    active ? cn(colorClasses[i], "scale-[1.02] shadow-lg") : completed ? "border-white/10 bg-bg-card opacity-80" : "border-border bg-bg-card opacity-70",
                     "hover:opacity-100"
                   )}
                 >
