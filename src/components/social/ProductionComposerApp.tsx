@@ -217,7 +217,6 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [imageReady, setImageReady] = useState(saved.current?.imageReady ?? false);
   const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(saved.current?.composedVideoUrl ?? null);
   const [showVideoModal, setShowVideoModal] = useState(false);
-  const [modalVideoUrl, setModalVideoUrl] = useState('');
   const [renderId, setRenderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -379,6 +378,10 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
             if (data.status === "completed") {
               clearInterval(interval);
               delete pollingRef.current[`clip-${clipNumber}`];
+              // Update clip with actual video duration from presenter engine
+              if (data.duration && typeof data.duration === "number") {
+                updateClip(clipNumber, { duration: Math.ceil(data.duration) });
+              }
               resolve(data.video_url ?? "");
             } else if (data.status === "failed" || attempts >= maxAttempts) {
               clearInterval(interval);
@@ -398,7 +401,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
         pollingRef.current[`clip-${clipNumber}`] = interval;
       });
     },
-    []
+    [updateClip]
   );
 
   // ─── Produce Video (full pipeline) ──────────────────────────────────────
@@ -738,7 +741,6 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               const outputUrl = data.outputUrl ?? `/api/video/compose-download?renderId=${newRenderId}`;
               console.log("[compose-video] Complete! Output:", outputUrl);
               setComposedVideoUrl(outputUrl);
-              setModalVideoUrl(outputUrl);
               setShowVideoModal(true);
               resolve();
             } else if (data.status === "failed" || attempts >= 60) {
@@ -1654,7 +1656,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                   {composedVideoUrl && (
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => { setModalVideoUrl(composedVideoUrl); setShowVideoModal(true); }}
+                        onClick={() => setShowVideoModal(true)}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-bg-deep hover:bg-accent/90 transition-colors"
                       >
                         <Play size={14} />
@@ -1692,7 +1694,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 )}
                 {composedVideoUrl && (
                   <div className="rounded-xl border border-accent/20 bg-black overflow-hidden cursor-pointer"
-                       onClick={() => { setModalVideoUrl(composedVideoUrl); setShowVideoModal(true); }}>
+                       onClick={() => setShowVideoModal(true)}>
                     <video
                       src={composedVideoUrl}
                       className="w-full"
@@ -1763,7 +1765,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
       </div>
 
       {/* === FULL-SCREEN VIDEO MODAL === */}
-      {showVideoModal && (
+      {showVideoModal && composedVideoUrl && (
         <div
           onClick={() => setShowVideoModal(false)}
           className="fixed inset-0 z-[9999] flex items-center justify-center p-5"
@@ -1785,7 +1787,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
                 Final Composed Video
               </h3>
               <a
-                href={modalVideoUrl}
+                href={composedVideoUrl}
                 download
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent/50 bg-bg-deep text-accent hover:bg-accent/10 transition-colors"
               >
@@ -1794,7 +1796,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
               </a>
             </div>
             <video
-              src={modalVideoUrl}
+              src={composedVideoUrl}
               controls
               autoPlay
               className="w-full rounded-lg bg-black"

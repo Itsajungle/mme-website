@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       status: statusData?.status ?? "processing",
       video_url: statusData?.video_url ?? null,
+      duration: statusData?.duration ?? null,
       error: statusData?.error ?? null,
       source: "live",
     });
