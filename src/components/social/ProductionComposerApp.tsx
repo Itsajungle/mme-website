@@ -217,6 +217,7 @@ export function ProductionComposerApp({ brand }: ProductionComposerAppProps) {
   const [imageReady, setImageReady] = useState(saved.current?.imageReady ?? false);
   const [composedVideoUrl, setComposedVideoUrl] = useState<string | null>(saved.current?.composedVideoUrl ?? null);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [modalVideoUrl, setModalVideoUrl] = useState<string>(''  );
   const [renderId, setRenderId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
