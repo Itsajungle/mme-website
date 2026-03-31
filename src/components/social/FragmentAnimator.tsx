@@ -102,7 +102,7 @@ export default function FragmentAnimator({
   const [glowEnabled, setGlowEnabled] = useState(true);
   const [glowColor, setGlowColor] = useState(initialGlowColor);
   const [glowIntensity, setGlowIntensity] = useState(30);
-  const [speed, setSpeed] = useState(0.1);
+  const [speed, setSpeed] = useState(0.2);
   const [isRecording, setIsRecording] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fragmentsRef = useRef<Fragment[]>([]);
@@ -243,7 +243,7 @@ export default function FragmentAnimator({
       totalDist += dist;
       maxDist = Math.max(maxDist, dist);
       if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05 || Math.abs(dr) > 0.005) {
-        const ef = speed * (1 + (1 - dist / (maxDist || 1)) * 0.5);
+        const ef = speed * (1 + (1 - dist / (maxDist || 1)) * 2.0);
         frag.x += dx * ef; frag.y += dy * ef; frag.rotation += dr * ef;
       } else { frag.x = frag.targetX; frag.y = frag.targetY; frag.rotation = frag.targetRotation; }
     });
@@ -411,7 +411,7 @@ export default function FragmentAnimator({
           {/* Speed */}
           <div>
             <label className="text-[10px] uppercase tracking-widest text-white/40 mb-2 block">Speed</label>
-            <input type="range" min="0.02" max="0.25" step="0.01" value={speed}
+            <input type="range" min="0.05" max="0.5" step="0.02" value={speed}
               onChange={(e) => setSpeed(parseFloat(e.target.value))}
               className="w-full accent-emerald-500" />
             <div className="flex justify-between text-[10px] text-white/30 mt-1"><span>Slow</span><span>Fast</span></div>
