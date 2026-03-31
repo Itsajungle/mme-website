@@ -148,13 +148,25 @@ export default function FragmentAnimator({
 
   const initFragments = useCallback((img: HTMLImageElement, presetName: PresetName) => {
     const fragments: Fragment[] = [];
-    const stepX = img.width / GRID_SIZE;
-    const stepY = img.height / GRID_SIZE;
+    // Use canvas-space coordinates so fragments target the correct position on screen
+    const tgt = CANVAS_SIZES[targetAspectRatio] || CANVAS_SIZES["9:16"];
+    const cW = tgt.width, cH = tgt.height;
+    const maxW = cW * 0.7, maxH = cH * 0.4;
+    const sc = Math.min(maxW / img.width, maxH / img.height);
+    const offX = (cW - img.width * sc) / 2;
+    const offY = (cH - img.height * sc) / 2;
+    const scaledW = img.width * sc;
+    const scaledH = img.height * sc;
+    const stepX = scaledW / GRID_SIZE;
+    const stepY = scaledH / GRID_SIZE;
     const presetFn = PRESETS[presetName];
+    // Use canvas dimensions for preset scatter so fragments scatter across whole canvas
+    const canvasImg = { width: cW, height: cH } as HTMLImageElement;
     for (let i = 0; i <= GRID_SIZE; i++) {
       for (let j = 0; j <= GRID_SIZE; j++) {
-        const sourceX = i * stepX, sourceY = j * stepY;
-        const start = presetFn(img, i, j);
+        const sourceX = offX + i * stepX;
+        const sourceY = offY + j * stepY;
+        const start = presetFn(canvasImg, i, j);
         fragments.push({
           x: start.x, y: start.y,
           targetX: sourceX, targetY: sourceY,
@@ -164,7 +176,7 @@ export default function FragmentAnimator({
       }
     }
     fragmentsRef.current = fragments;
-  }, []);
+  }, [targetAspectRatio]);
 
   // Init fragments when image loads
   useEffect(() => {
@@ -216,7 +228,7 @@ export default function FragmentAnimator({
         -frag.radius, -frag.radius, frag.radius * 2, frag.radius * 2);
       ctx.restore();
     });
-  }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor, calcLogoTransform]);
+  }, [image, isAnimating, glowEnabled, glowColor, glowIntensity, bgColor, canvasW, canvasH]);
 
   const stopRecording = useCallback(() => {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();

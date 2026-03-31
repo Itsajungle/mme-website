@@ -98,13 +98,25 @@ export async function generateSpeech(
   voiceId: string,
   settings: Partial<VoiceSettings> = {}
 ): Promise<GeneratedAudio> {
+  // Auto-detect cloned voices so callers do not need to pass isCloned
+  let isCloned = settings.isCloned ?? false;
+  if (!isCloned) {
+    try {
+      const vRes = await fetch(API_BASE + "/voices/" + voiceId, { headers: headers() });
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        const cat = vData.category || "";
+        isCloned = cat === "cloned" || cat === "professional" || (vData.labels?.use_case === "cloned");
+      }
+    } catch { /* proceed with defaults */ }
+  }
   const body = {
     text,
     model_id: "eleven_v3",
     voice_settings: {
-      stability: settings.stability ?? (settings.isCloned ? 0.75 : 0.5),
-      similarity_boost: settings.similarityBoost ?? (settings.isCloned ? 0.95 : 0.8),
-      style: settings.style ?? (settings.isCloned ? 0.05 : 0.3),
+      stability: settings.stability ?? (isCloned ? 0.75 : 0.5),
+      similarity_boost: settings.similarityBoost ?? (isCloned ? 0.95 : 0.8),
+      style: settings.style ?? (isCloned ? 0.05 : 0.3),
       use_speaker_boost: settings.useSpeakerBoost ?? true,
     },
     output_format: "mp3_44100_128",
