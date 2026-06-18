@@ -1,25 +1,26 @@
 import { Hero } from "@/components/home/Hero";
-import { Problem } from "@/components/home/Problem";
-import { Pipeline } from "@/components/home/Pipeline";
-import { Verticals } from "@/components/home/Verticals";
-import { MediaCommerce } from "@/components/home/MediaCommerce";
-import { Stats } from "@/components/home/Stats";
-import { UseCaseSpotlight } from "@/components/home/UseCaseSpotlight";
-import { Testimonials } from "@/components/home/Testimonials";
-import { CTASection } from "@/components/home/CTASection";
+import { TheShift } from "@/components/home/TheShift";
+import { EngineLoop } from "@/components/home/EngineLoop";
+import { CommunityLayer } from "@/components/home/CommunityLayer";
+import { AgentTeam } from "@/components/home/AgentTeam";
+import { ProofVerticals } from "@/components/home/ProofVerticals";
+import { WhoItsFor } from "@/components/home/WhoItsFor";
+import { Plans } from "@/components/home/Plans";
+import { ConnectionCTA } from "@/components/home/ConnectionCTA";
 
 export default function Home() {
   return (
     <>
+      {/* Content → Community → Connection spine */}
       <Hero />
-      <Problem />
-      <Pipeline />
-      <Verticals />
-      <MediaCommerce />
-      <Stats />
-      <UseCaseSpotlight />
-      <Testimonials />
-      <CTASection />
+      <TheShift />
+      <EngineLoop />
+      <CommunityLayer />
+      <AgentTeam />
+      <ProofVerticals />
+      <WhoItsFor />
+      <Plans />
+      <ConnectionCTA />
     </>
   );
 }

@@ -64,6 +64,22 @@ h1, h2, h3, h4, h5, h6 {
   color: #F8FAFC;
 }
 
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow {
+    animation: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
 }
