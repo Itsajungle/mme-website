@@ -90,7 +90,7 @@ export default function PrivacyPage() {
       <h2 className="mt-10 text-xl font-semibold">Changes and contact</h2>
       <p className="mt-3">
         We may update this policy from time to time; the date above shows the latest revision.
-        Questions or requests: <a className="underline" href="mailto:peter@itsajungle.tv">peter@itsajungle.tv</a>.
+        Questions or requests: <a className="underline" href="mailto:hello@humaintech.ai">hello@humaintech.ai</a>.
       </p>
     </main>
   );

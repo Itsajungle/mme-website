@@ -86,7 +86,7 @@ export default function TermsPage() {
 
       <h2 className="mt-10 text-xl font-semibold">Contact</h2>
       <p className="mt-3">
-        Questions about these terms: <a className="underline" href="mailto:peter@itsajungle.tv">peter@itsajungle.tv</a>.
+        Questions about these terms: <a className="underline" href="mailto:hello@humaintech.ai">hello@humaintech.ai</a>.
       </p>
     </main>
   );
