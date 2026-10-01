@@ -20,6 +20,7 @@ import { ScriptEditor } from "./ScriptEditor";
 import { AudioPreview } from "./AudioPreview";
 import { ComProdScore } from "./ComProdScore";
 import type { TimelineSegment } from "./ProductionTimeline";
+import { IRISH_VOICES } from "@/lib/audio-engine/irish-voices";
 
 const TRIGGER_TYPES = [
   "Weather", "Sport", "News", "Culture", "Traffic", "Seasonal", "Industry", "Breaking",
@@ -35,28 +36,8 @@ const TONES = [
   { key: "emotional", label: "Emotional" },
 ] as const;
 
-// Irish voice roster for pilot — ElevenLabs voices
-const VOICE_ROSTER = [
-  { id: "mFgXOmlOfXfr6suoQkRH", name: "Frances", description: "Soft, warm, calm Irish accent", gender: "female" },
-  { id: "3b8fXc91YHS1i2DYAlBQ", name: "Laura", description: "Warm, articulate Irish female", gender: "female" },
-  { id: "SpA6eNczAK7oucJPiPpw", name: "Beckie", description: "Mature, gentle Irish female", gender: "female" },
-  { id: "1OYA2kgM85gF2eGN8HEp", name: "Colleen", description: "Warm southern Irish woman", gender: "female" },
-  { id: "EfdW5L7xDpYTHDlIRmg9", name: "Aisling", description: "Young Irish female, calm & informative", gender: "female" },
-  { id: "1e9Gn3OQenGu4rjQ3Du1", name: "Niamh", description: "Young Irish female, soft & friendly", gender: "female" },
-  { id: "sgk995upfe3tYLvoGcBN", name: "Labhaoise", description: "Casual Irish woman, warm & grounded", gender: "female" },
-  { id: "rdEILoSxdT6xKDZ56abJ", name: "Isla Wilde", description: "Gentle, soft neutral Irish accent", gender: "female" },
-  { id: "Qrq52PIvoZXeAbdtAugP", name: "Susan", description: "Cloned voice — Sunshine 106.8", gender: "female" },
-  { id: "2WvAXMgrakBkapSmnlv7", name: "Flynn", description: "Natural, crisp neutral Irish", gender: "male" },
-  { id: "8SNzJpKT62Cqqqe8Injx", name: "Michael", description: "Soft Irish male, melodic & soothing", gender: "male" },
-  { id: "zpnRoleXRhWcv8KmQc0N", name: "James Fitzgerald", description: "Middle-aged Irish, clear baritone", gender: "male" },
-  { id: "RlSVB64yXMZJjq67jbB1", name: "Bren", description: "Calm conversational Irish male", gender: "male" },
-  { id: "5OgOMFAcpSKqVQHHQHrU", name: "Thomas", description: "West of Ireland, enthusiastic narration", gender: "male" },
-  { id: "huSf6WJX1X9lGY6I9CfQ", name: "Stephen", description: "Calm, versatile Irish narrator", gender: "male" },
-  { id: "9TYDukkUVpJPDSIuv3ir", name: "Darren", description: "Calm masculine Irish, cinematic", gender: "male" },
-  { id: "7nDsTGv9cjBVU2m1OA8F", name: "Paul", description: "Irish broadcaster, DJ-style delivery", gender: "male" },
-  { id: "1yDXKNtyiAtDljYHKmZy", name: "Paddy Irishman", description: "Middle-aged Irish, nostalgic character", gender: "male" },
-  { id: "B5jEZPqk2OJ2vkPw3wBM", name: "Cillian", description: "Cloned voice — Irish male", gender: "male" },
-] as const;
+// Irish voice roster — shared with the studio
+const VOICE_ROSTER = IRISH_VOICES.map((v) => ({ id: v.id, name: v.name, description: v.style, gender: v.gender }));
 
 type Tone = typeof TONES[number]["key"];
 
@@ -100,7 +81,7 @@ export function RadioAdGenerator({ brand, mode, onAudioGenerated }: RadioAdGener
   const [selectedVoiceId, setSelectedVoiceId] = useState(
     VOICE_ROSTER.some(v => v.id === brand.audioBrandKit.voiceId)
       ? brand.audioBrandKit.voiceId
-      : VOICE_ROSTER[12].id // Default to Bren (confirmed working)
+      : VOICE_ROSTER[0].id // Default: Paul, Irish broadcaster
   );
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [musicUrl, setMusicUrl] = useState("");

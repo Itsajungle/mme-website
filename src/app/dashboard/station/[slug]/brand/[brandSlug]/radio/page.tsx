@@ -11,7 +11,10 @@ import CampaignHistory from "@/components/brand/CampaignHistory";
 import { RadioAdGenerator } from "@/components/radio/RadioAdGenerator";
 import { AudioBrandKitEditor } from "@/components/radio/AudioBrandKitEditor";
 import { AdLibrary } from "@/components/radio/AdLibrary";
-import { ProductionTimeline, type TimelineSegment } from "@/components/radio/ProductionTimeline";
+import type { TimelineSegment } from "@/components/radio/ProductionTimeline";
+import { Studio } from "@/components/radio/studio/Studio";
+import { sendToStudio } from "@/components/radio/studio/bus";
+import { JingleStudio } from "@/components/radio/JingleStudio";
 import { VoiceBank } from "@/components/radio/VoiceBank";
 import { MusicBank } from "@/components/radio/MusicBank";
 import { SFXBank } from "@/components/radio/SFXBank";
@@ -33,8 +36,23 @@ export default function RadioTabPage({
   const [activeRadioTab, setActiveRadioTab] = useState<RadioTab>("generate");
   const [mode, setMode] = useState<"automated" | "hybrid">("hybrid");
   const [selectedVoice, setSelectedVoice] = useState<VoiceProfile | null>(null);
-  const [generatedSegments, setGeneratedSegments] = useState<TimelineSegment[] | undefined>(undefined);
-  const [generatedDuration, setGeneratedDuration] = useState("30s");
+  const loadIntoStudio = (segs: TimelineSegment[], dur: string) => {
+    const length = parseInt(dur, 10) || 30;
+    sendToStudio({
+      replace: true,
+      length,
+      clips: segs
+        .filter((s) => s.audioUrl)
+        .map((s) => ({
+          url: s.audioUrl as string,
+          name: s.label,
+          role: s.track === "voice" ? "voice" : s.track === "music" ? "bed" : "sfx",
+          start: s.start,
+          gain: Math.max(0.05, s.volume / 100),
+          duration: s.track === "music" ? Math.max(1, s.end - s.start) : undefined,
+        })),
+    });
+  };
 
   if (!client) return null;
 
@@ -136,16 +154,18 @@ export default function RadioTabPage({
 
               {/* Radio Ad Generator */}
               <div className="rounded-xl border border-border bg-bg-card p-6">
-                <RadioAdGenerator brand={brand} mode={mode} onAudioGenerated={(segs, dur) => { setGeneratedSegments(segs); setGeneratedDuration(dur); }} />
+                <RadioAdGenerator brand={brand} mode={mode} onAudioGenerated={(segs, dur) => { if (mode === "hybrid") loadIntoStudio(segs, dur); }} />
               </div>
 
-              {/* Production Timeline — Hybrid mode only */}
+              {/* Jingle Studio — sung jingles from a plain-English brief */}
+              <div className="rounded-xl border border-fuchsia-500/20 bg-bg-card p-6">
+                <JingleStudio brandName={brand.name} />
+              </div>
+
+              {/* Studio — multitrack edit, Hybrid mode only */}
               {mode === "hybrid" && (
                 <div className="rounded-xl border border-border bg-bg-card p-6">
-                  <ProductionTimeline
-                    duration={generatedDuration}
-                    segments={generatedSegments}
-                  />
+                  <Studio adName={`${brand.slug}-spot`} />
                 </div>
               )}
             </div>

@@ -2,9 +2,7 @@
 // Handles voice synthesis, SFX generation, and music generation
 
 import type { VoiceProfile, VoiceSettings, GeneratedAudio } from "./types";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { randomUUID } from "crypto";
+import { saveCleanAudio } from "./ffmpeg";
 
 const API_BASE = "https://api.elevenlabs.io/v1";
 
@@ -25,17 +23,12 @@ function headers(): Record<string, string> {
 
 async function saveAudioFile(
   buffer: ArrayBuffer,
-  prefix: string,
-  ext: string = "mp3"
-): Promise<{ url: string; filename: string }> {
-  // Save to /tmp which is always writable in Docker containers
-  // Serve via /api/audio/serve?file= route instead of public/ static files
-  const dir = "/tmp/mme-audio";
-  await mkdir(dir, { recursive: true });
-  const filename = `${prefix}-${randomUUID().slice(0, 8)}.${ext}`;
-  const filepath = join(dir, filename);
-  await writeFile(filepath, Buffer.from(buffer));
-  return { url: `/api/audio/serve?file=${filename}`, filename };
+  prefix: string
+): Promise<{ url: string; filename: string; duration: number | null }> {
+  // Clean every generated file: re-encode and strip all metadata/vendor tags,
+  // then serve from /tmp via /api/audio/serve.
+  const { filename, duration } = await saveCleanAudio(buffer, prefix, "mp3");
+  return { url: `/api/audio/serve?file=${filename}`, filename, duration };
 }
 
 // Irish/UK accent keywords for filtering
@@ -110,19 +103,24 @@ export async function generateSpeech(
       }
     } catch { /* proceed with defaults */ }
   }
+  const modelId = settings.modelId || process.env.VOICE_MODEL_ID || "eleven_v3";
+  const isV3 = modelId.startsWith("eleven_v3");
+  // v3 only accepts stability presets 0 (creative), 0.5 (natural), 1 (robust)
+  const rawStability = settings.stability ?? (isV3 ? 0.5 : 0.75);
+  const stability = isV3 ? [0, 0.5, 1].reduce((a, b) => (Math.abs(b - rawStability) < Math.abs(a - rawStability) ? b : a)) : rawStability;
   const body = {
     text,
-    model_id: "eleven_v3",
+    model_id: modelId,
     voice_settings: {
-      stability: settings.stability ?? 0.75,
-      similarity_boost: settings.similarityBoost ?? 0.95,
-      style: settings.style ?? 0.05,
+      stability,
+      similarity_boost: settings.similarityBoost ?? (isCloned ? 0.95 : 0.8),
+      style: settings.style ?? (isV3 ? undefined : 0.05),
       use_speaker_boost: settings.useSpeakerBoost ?? true,
+      ...(settings.speed ? { speed: settings.speed } : {}),
     },
-    output_format: "mp3_44100_128",
   };
 
-  const res = await fetch(`${API_BASE}/text-to-speech/${voiceId}`, {
+  const res = await fetch(`${API_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(body),
@@ -130,16 +128,14 @@ export async function generateSpeech(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Speech generation failed: ${res.status} - ${err}`);
+    console.error("[voice-engine]", res.status, err);
+    throw new Error(`Speech generation failed (${res.status})`);
   }
 
   const buffer = await res.arrayBuffer();
-  const { url, filename } = await saveAudioFile(buffer, "voice");
-
-  // Estimate duration from text (2.5 words/sec average)
-  const wordCount = text.split(/\s+/).length;
-  const estimatedDuration = wordCount / 2.5;
-
+  const { url, filename, duration } = await saveAudioFile(buffer, "voice");
+  // Real duration from the file; fall back to ~2.5 words/sec
+  const estimatedDuration = duration ?? text.split(/\s+/).length / 2.5;
   return { url, duration: estimatedDuration, format: "mp3", filename };
 }
 
@@ -169,7 +165,8 @@ export async function cloneVoice(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Voice cloning failed: ${res.status} - ${err}`);
+    console.error("[voice-clone]", res.status, err);
+    throw new Error(`Voice cloning failed (${res.status})`);
   }
 
   const data = await res.json();
@@ -203,37 +200,61 @@ export async function generateSoundEffect(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`SFX generation failed: ${res.status} - ${err}`);
+    console.error("[sfx-engine]", res.status, err);
+    throw new Error(`SFX generation failed (${res.status})`);
   }
 
   const buffer = await res.arrayBuffer();
-  const { url, filename } = await saveAudioFile(buffer, "sfx");
-
-  return { url, duration: durationSeconds, format: "mp3", filename };
+  const { url, filename, duration } = await saveAudioFile(buffer, "sfx");
+  return { url, duration: duration ?? durationSeconds, format: "mp3", filename };
 }
 
 export async function generateMusic(
   prompt: string,
+  durationSeconds: number,
+  options: { instrumental?: boolean } = {}
+): Promise<GeneratedAudio> {
+  const lengthMs = Math.round(Math.min(Math.max(durationSeconds, 3), 300) * 1000);
+  const buffer = await composeMusic({
+    prompt,
+    music_length_ms: lengthMs,
+    force_instrumental: options.instrumental ?? true,
+  });
+  const { url, filename, duration } = await saveAudioFile(buffer, "music");
+  return { url, duration: duration ?? durationSeconds, format: "mp3", filename };
+}
+
+/**
+ * Sung jingle: lyrics are embedded in the prompt, vocals allowed.
+ */
+export async function generateJingle(
+  stylePrompt: string,
+  lyrics: string,
   durationSeconds: number
 ): Promise<GeneratedAudio> {
-  const body = {
-    prompt,
-    duration_seconds: Math.min(Math.max(durationSeconds, 3), 300),
-  };
+  const lengthMs = Math.round(Math.min(Math.max(durationSeconds, 5), 120) * 1000);
+  const prompt = `${stylePrompt}\n\nLyrics:\n${lyrics}`.slice(0, 4000);
+  const buffer = await composeMusic({ prompt, music_length_ms: lengthMs });
+  const { url, filename, duration } = await saveAudioFile(buffer, "jingle");
+  return { url, duration: duration ?? durationSeconds, format: "mp3", filename };
+}
 
-  const res = await fetch(`${API_BASE}/music/generate`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
+const MUSIC_MODELS = (process.env.MUSIC_MODEL_ID || "music_v2_5,music_v1").split(",").map((m) => m.trim()).filter(Boolean);
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Music generation failed: ${res.status} - ${err}`);
+async function composeMusic(body: Record<string, unknown>): Promise<ArrayBuffer> {
+  let lastErr = "";
+  // Try newest model first, fall back to older ones the account may have.
+  for (const model of [...MUSIC_MODELS, ""]) {
+    const payload = model ? { ...body, model_id: model } : body;
+    const res = await fetch(`${API_BASE}/music?output_format=mp3_44100_192`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return res.arrayBuffer();
+    lastErr = `${res.status}`;
+    // Only retry on model/validation problems; auth or quota errors won't improve.
+    if (res.status !== 400 && res.status !== 422) break;
   }
-
-  const buffer = await res.arrayBuffer();
-  const { url, filename } = await saveAudioFile(buffer, "music");
-
-  return { url, duration: durationSeconds, format: "mp3", filename };
+  throw new Error(`Music generation failed (${lastErr})`);
 }
