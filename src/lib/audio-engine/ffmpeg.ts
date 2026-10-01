@@ -217,18 +217,34 @@ export function buildRenderArgs(req: RenderRequest, files: string[], outPath: st
     trackOut.forEach((t) => finalLabels.push(`[${t.label}]`));
   }
 
-  const lufs = Math.max(-30, Math.min(-9, req.loudness ?? -16));
+  // Pre-master: sum everything, trim to length. Loudness is applied afterwards in two passes.
   const master = `${finalLabels.join("")}amix=inputs=${finalLabels.length}:normalize=0:duration=longest,` +
-    `atrim=duration=${n(total)},loudnorm=I=${lufs}:TP=-1.0:LRA=9,alimiter=limit=0.95,aresample=${outFmt === "wav" ? 48000 : 44100}[out]`;
+    `atrim=duration=${n(total)}[out]`;
   filters.push(master);
+  void outFmt;
 
   const args = ["-y"];
   files.forEach((f) => args.push("-i", f));
-  args.push("-filter_complex", filters.join(";"), "-map", "[out]", "-map_metadata", "-1");
-  if (outFmt === "mp3") args.push("-c:a", "libmp3lame", "-b:a", "320k", "-id3v2_version", "0");
-  else args.push("-c:a", "pcm_s24le");
+  args.push("-filter_complex", filters.join(";"), "-map", "[out]", "-map_metadata", "-1", "-c:a", "pcm_f32le", "-ar", "48000");
   args.push(outPath);
   return args;
+}
+
+/** Two-pass EBU R128 loudness normalisation with a true-peak ceiling. */
+async function masterLoudness(input: string, output: string, lufs: number, fmt: "mp3" | "wav") {
+  const target = `I=${lufs}:TP=-1.0:LRA=11`;
+  const { stderr } = await execFileAsync("ffmpeg", ["-hide_banner", "-i", input, "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"], { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
+  const json = stderr.slice(stderr.lastIndexOf("{"), stderr.lastIndexOf("}") + 1);
+  let second = `loudnorm=${target}`;
+  try {
+    const m = JSON.parse(json);
+    second = `loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+  } catch { /* fall back to single pass */ }
+  const args = ["-y", "-i", input, "-af", `${second},alimiter=limit=0.89:level=false`, "-map_metadata", "-1"];
+  if (fmt === "mp3") args.push("-ar", "44100", "-c:a", "libmp3lame", "-b:a", "320k", "-id3v2_version", "0");
+  else args.push("-ar", "48000", "-c:a", "pcm_s24le");
+  args.push(output);
+  await execFileAsync("ffmpeg", args, { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
 }
 
 export async function renderStudio(req: RenderRequest): Promise<{ mp3Url?: string; wavUrl?: string; duration: number }> {
@@ -239,12 +255,18 @@ export async function renderStudio(req: RenderRequest): Promise<{ mp3Url?: strin
   const id = randomUUID().slice(0, 6);
   const formats: ("mp3" | "wav")[] = req.formats?.length ? req.formats : ["mp3"];
   const out: { mp3Url?: string; wavUrl?: string; duration: number } = { duration: req.totalDuration };
-  for (const fmt of formats) {
-    const filename = `${base}-${id}.${fmt}`;
-    const args = buildRenderArgs({ ...req, clips: active }, files, join(dir, filename), fmt);
-    await execFileAsync("ffmpeg", args, { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
-    if (fmt === "mp3") out.mp3Url = `/api/audio/serve?file=${filename}`;
-    else out.wavUrl = `/api/audio/serve?file=${filename}`;
+  const premaster = join(dir, `pre-${id}.wav`);
+  await execFileAsync("ffmpeg", buildRenderArgs({ ...req, clips: active }, files, premaster, "wav"), { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
+  const lufs = Math.max(-30, Math.min(-9, req.loudness ?? -16));
+  try {
+    for (const fmt of formats) {
+      const filename = `${base}-${id}.${fmt}`;
+      await masterLoudness(premaster, join(dir, filename), lufs, fmt);
+      if (fmt === "mp3") out.mp3Url = `/api/audio/serve?file=${filename}`;
+      else out.wavUrl = `/api/audio/serve?file=${filename}`;
+    }
+  } finally {
+    unlink(premaster).catch(() => {});
   }
   return out;
 }
