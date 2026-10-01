@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const secs = [15, 30, 60].includes(Number(durationSeconds)) ? Number(durationSeconds) : 30;
     const client = new Anthropic({ apiKey: key });
     const msg = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
       max_tokens: 1500,
       system: SYSTEM,
       messages: [{

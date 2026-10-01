@@ -11,7 +11,7 @@ import path from "path";
 // ─── Anthropic API helper ────────────────────────────────────────────────────
 
 const ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
 
 async function callClaude(system: string, userMessage: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;

@@ -102,7 +102,7 @@ This is a ${durationStr}-second ad. You MUST land within ${target.min}–${targe
     const client = new Anthropic();
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"),
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
@@ -133,7 +133,7 @@ This is a ${durationStr}-second ad. You MUST land within ${target.min}–${targe
       } Return the corrected script in the same JSON format. Count words carefully.`;
 
       const retryResponse = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"),
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: [

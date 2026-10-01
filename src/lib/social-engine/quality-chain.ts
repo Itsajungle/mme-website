@@ -9,9 +9,9 @@ import type { SocialContentParams, GeneratedCopy, SocialQualityResult, QualitySc
 const ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages";
 
 // Stage 1 reviewer — platform tone, brand voice, moment relevance, engagement quality
-const EP_MODEL = "claude-sonnet-4-20250514";
+const EP_MODEL = (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
 // Stage 2 reviewer — final creative sign-off and POP Factor assessment
-const CD_MODEL = "claude-opus-4-20250514";
+const CD_MODEL = (process.env.ANTHROPIC_MODEL_PREMIUM || "claude-opus-5-5");
 
 interface AnthropicMessage {
   model: string;
