@@ -85,7 +85,7 @@ IMPORTANT: The offer card in clip 4 MUST use the exact same car year, model, pri
     const client = new Anthropic();
 
     const response = await client.messages.create({
-      model: (process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"),
+      model: (process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6"),
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
